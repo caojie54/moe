@@ -13,7 +13,7 @@ if [ "$num_devices" -gt "$max_devices" ]; then
 fi
 
 # train
-epochs=2
+epochs=5
 dataset="QMSum_gold_clean"
 max_seq_len=3000
 min_gen_len=120
@@ -22,13 +22,12 @@ lora_targets="Q,K,V,O"
 lora_alpha=64
 expert_num=6
 hydra_moe=True # hydra lora, Asymmetric LoRA
-expert_weight=False
 blr=6e-3
 flash_attention2=True
 bf16=True
 tag=""
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_lora_moe_s/${dataset}/b32_epoch${epochs}_warme1_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_expertW${expert_weight}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_lora_moe_s/${dataset}/b32_epoch${epochs}_warme1_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3037 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
@@ -40,7 +39,6 @@ torchrun --nproc_per_node $num_devices --master_port=3037 main_finetune.py \
     --lora_alpha $lora_alpha \
     --expert_num $expert_num \
     --hydra_moe $hydra_moe \
-    --expert_weight $expert_weight \
     --max_seq_len $max_seq_len \
     --batch_size 1 \
     --accum_iter $((32/$num_devices)) \

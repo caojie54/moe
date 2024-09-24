@@ -26,13 +26,8 @@ while true; do
         export CUDA_VISIBLE_DEVICES="$eligible_gpus"
         echo "Running command on GPUs: $CUDA_VISIBLE_DEVICES"
         # bash ./exps/finetuning_CovidET_generate_evaluate.sh
-        bash ./exps/finetuning_QMsumgoldclean_generate_evaluate_3-1_1.sh
-        bash ./exps/finetuning_QMsumgoldclean_generate_evaluate_3-1_2.sh
-        # bash ./exps/finetuning_QMsumgoldclean_generate_evaluate_3-1_3.sh
-        # bash ./exps/finetuning_QMsumgoldclean_generate_evaluate_3-1_4.sh
-        # bash ./exps/finetuning_QMsumgoldclean_generate_evaluate_3-1_5.sh
-        # bash ./exps/finetuning_QMsumgoldclean_generate_evaluate_3-1_6.sh
-        # bash ./exps/finetuning_QMsumgoldclean_generate_evaluate_3-1_7.sh
+        # bash ./exps/finetuning_QMsumgoldclean_generate_evaluate_3-1_1.sh
+        bash ./exps/finetuning_llama3-1_math14k_generate_evaluate.sh
         break
     else
         echo "No GPU with more than $memory GB unused memory."

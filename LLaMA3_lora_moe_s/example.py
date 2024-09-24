@@ -16,6 +16,19 @@ from fairscale.nn.model_parallel.initialize import initialize_model_parallel
 
 from llama import LLaMA_adapter, ModelArgs
 
+PROMPT_DICT = {
+    "prompt_input": (
+        "Below is an instruction that describes a task, paired with an input that provides further context. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
+    ),
+    "prompt_no_input": (
+        "Below is an instruction that describes a task. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Response:"
+    ),
+}
+
 prompt_input = [(
                     "Below is an instruction that describes a task, paired with an input that provides further context. "
                     "Write a response that appropriately completes the request.\n\n"
@@ -119,6 +132,8 @@ def main(
         for line in lines:
             obj = json.loads(line)
             ann.append(obj)
+    else:
+        ann = json.load(open(data_path))
             
     print(f'local rank:{local_rank},  world size:{world_size}')
 
@@ -140,24 +155,29 @@ def main(
     for batch in tqdm(batchs):
         prompts = []
         for x in batch:
-            prompt0 = prompt_input[0]
-            instruction = x['instruction']
-            prompt1 = prompt_input[1]
-            input = x['input']
-            prompt2 = prompt_input[2]
+            if x.get("input", "") == "":
+                prompt = PROMPT_DICT["prompt_no_input"].format_map(x)
+                prompt = torch.tensor(model.tokenizer.encode(prompt, bos=True, eos=False), dtype=torch.int64)
+            else:
+                prompt0 = prompt_input[0]
+                instruction = x['instruction']
+                prompt1 = prompt_input[1]
+                input = x['input']
+                prompt2 = prompt_input[2]
 
-            prompt0_token = model.tokenizer.encode(prompt0, bos=True, eos=False) # bos
-            instruction_token = model.tokenizer.encode(instruction, bos=False, eos=False)
-            prompt1_token = model.tokenizer.encode(prompt1, bos=False, eos=False)
+                prompt0_token = model.tokenizer.encode(prompt0, bos=True, eos=False) # bos
+                instruction_token = model.tokenizer.encode(instruction, bos=False, eos=False)
+                prompt1_token = model.tokenizer.encode(prompt1, bos=False, eos=False)
 
-            part1_token = prompt0_token + instruction_token + prompt1_token
+                part1_token = prompt0_token + instruction_token + prompt1_token
 
-            input_token = model.tokenizer.encode(input, bos=False, eos=False)
-            prompt2_token = model.tokenizer.encode(prompt2, bos=False, eos=False)
-            max_input_length = max_seq_len - (len(part1_token) + len(prompt2_token) + min_gen_len)
+                input_token = model.tokenizer.encode(input, bos=False, eos=False)
+                prompt2_token = model.tokenizer.encode(prompt2, bos=False, eos=False)
+                max_input_length = max_seq_len - (len(part1_token) + len(prompt2_token) + min_gen_len)
 
-            input_token = input_token[:max_input_length]
-            prompt = part1_token + input_token + prompt2_token
+                input_token = input_token[:max_input_length]
+                prompt = part1_token + input_token + prompt2_token
+
             prompts.append(prompt)
                 
         results = model.generate(prompts, max_gen_len=max_gen_len, temperature=temperature, top_p=top_p)
@@ -166,9 +186,10 @@ def main(
             for i,result in enumerate(results):
                 tmp_result = {}
                 tmp_result['generate'] = result
-                tmp_result['abstract'] = batch[i]['output']
-                tmp_result['article'] = batch[i]['input']
+                tmp_result['output'] = batch[i]['output']
+                tmp_result['input'] = batch[i]['input']
                 tmp_result['instruction'] = batch[i]['instruction']
+                tmp_result['answer'] = batch[i].get('answer','')
                 json_data = json.dumps(tmp_result, ensure_ascii=False)
                 f.write(json_data + '\n')
                 # print(result)

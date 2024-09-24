@@ -67,7 +67,7 @@ class MOELoraLayer(nn.Module):
             nn.init.zeros_(self.lora_B.weight)
 
         elif expert_num > 1: # moe
-            self.router = nn.Linear(input_dim, expert_num, bias=False)
+            # self.router = nn.Linear(input_dim, expert_num, bias=False)
             if hydra:
                 self.lora_A = nn.Linear(input_dim, r, bias=False)
             else:
@@ -103,14 +103,14 @@ class MOELoraLayer(nn.Module):
         return self.params_num
 
 
-    def forward(self, x: torch.Tensor, type_weight: Optional[torch.Tensor]):
+    def forward(self, x: torch.Tensor, route_weight: Optional[torch.Tensor]):
         if self.expert_num == 1:
             return self.lora_B(self.lora_A(x)) * self.scaling
         
         # type_weight: [bsz, seqlen]
-        route_weight = nn.functional.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # [bsz, seqlen, expert_num]
+        # route_weight = nn.functional.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # [bsz, seqlen, expert_num]
         # lora type weight
-        route_weight = route_weight * type_weight.unsqueeze(-1)
+        # route_weight = route_weight * type_weight.unsqueeze(-1)
 
         result = None
         for i in range(self.expert_num):
@@ -255,8 +255,8 @@ class Attention(nn.Module):
             if 'O' in self.lora_targets:
                 self.lora_O = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
             
-            self.lora_type = len(self.lora_targets)
-            self.lora_type_router = nn.Linear(args.dim, self.lora_type, bias=False)
+            self.lora_number = len(self.lora_targets) * args.expert_num
+            self.lora_router = nn.Linear(args.dim, self.lora_number, bias=False)
 
             # self.expert_weight = args.expert_weight
             # if self.expert_weight:
@@ -294,20 +294,18 @@ class Attention(nn.Module):
         bsz, seqlen, _ = x.shape
         xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
 
-        type_weight = self.lora_type * nn.functional.softmax(self.lora_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, loratype]
-        # if self.expert_weight:
-        #     type_weight = type_weight * self.type_weight_param.to(x).unsqueeze(0).unsqueeze(0)
-        type_idx = 0
+        lora_weight = self.lora_number * nn.functional.softmax(self.lora_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, loratype]
+        lora_idx = 0
         if self.w_lora:
             if 'Q' in self.lora_targets:
-                xq = xq + self.lora_Q(x, type_weight[:,:,type_idx])
-                type_idx += 1
+                xq = xq + self.lora_Q(x, lora_weight[:,:,lora_idx:lora_idx+self.args.expert_num])
+                lora_idx += self.args.expert_num
             if 'K' in self.lora_targets:
-                xk = xk + self.lora_K(x, type_weight[:,:,type_idx])
-                type_idx += 1
+                xk = xk + self.lora_K(x, lora_weight[:,:,lora_idx:lora_idx+self.args.expert_num])
+                lora_idx += self.args.expert_num
             if 'V' in self.lora_targets:
-                xv = xv + self.lora_V(x, type_weight[:,:,type_idx])
-                type_idx += 1
+                xv = xv + self.lora_V(x, lora_weight[:,:,lora_idx:lora_idx+self.args.expert_num])
+                lora_idx += self.args.expert_num
 
         xq = xq.view(bsz, seqlen, self.n_local_heads, self.head_dim)
         xk = xk.view(bsz, seqlen, self.n_local_kv_heads, self.head_dim)
@@ -356,7 +354,7 @@ class Attention(nn.Module):
             ).contiguous().view(bsz, seqlen, -1)
 
         if self.w_lora and 'O' in self.lora_targets:
-            return self.wo(output) + self.lora_O(output, type_weight[:,:,type_idx])
+            return self.wo(output) + self.lora_O(output, lora_weight[:,:,lora_idx:lora_idx+self.args.expert_num])
         else:
             return self.wo(output)
 

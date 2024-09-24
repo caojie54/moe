@@ -13,7 +13,7 @@ if [ "$num_devices" -gt "$max_devices" ]; then
 fi
 
 # train
-epochs=2
+epochs=3
 dataset="QMSum_gold_clean"
 max_seq_len=3000
 min_gen_len=120

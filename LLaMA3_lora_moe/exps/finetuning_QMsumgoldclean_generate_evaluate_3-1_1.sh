@@ -13,7 +13,7 @@ if [ "$num_devices" -gt "$max_devices" ]; then
 fi
 
 # train
-epochs=2
+epochs=3
 dataset="QMSum_gold_clean"
 max_seq_len=3000
 min_gen_len=120
@@ -64,7 +64,7 @@ torchrun --nproc_per_node $num_devices --master_port=3037 example.py \
     --save_path $save_path \
     --max_gen_len 128 \
     --min_gen_len $min_gen_len \
-    --max_batch_size 10 \
+    --max_batch_size 20 \
     --temperature 0.1 \
     --top_p 0.75
 

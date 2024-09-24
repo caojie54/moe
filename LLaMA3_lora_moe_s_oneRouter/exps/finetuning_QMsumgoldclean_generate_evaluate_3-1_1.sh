@@ -5,7 +5,7 @@ num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=2
+max_devices=1
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -28,9 +28,9 @@ flash_attention2=True
 bf16=True
 tag=""
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_lora_moe_s/${dataset}/b32_epoch${epochs}_warme1_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_expertW${expert_weight}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_lora_moe_s_oneRouter/${dataset}/b32_epoch${epochs}_warme1_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_expertW${expert_weight}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
-torchrun --nproc_per_node $num_devices --master_port=3037 main_finetune.py \
+torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --data_path ${path}/datasets/${dataset}/train.jsonl \
     --val_data_path ${path}/datasets/${dataset}/test.jsonl \
@@ -59,7 +59,7 @@ python extract_adapter_from_checkpoint.py --checkpoint $checkpoint
 
 adapter_path="${output_dir}adapter.pth"
 save_path="${output_dir}predict_mingen$min_gen_len.jsonl"
-torchrun --nproc_per_node $num_devices --master_port=3037 example.py \
+torchrun --nproc_per_node $num_devices --master_port=3038 example.py \
     --ckpt_dir ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --adapter_path $adapter_path \
     --data_path ${path}/datasets/${dataset}/test.jsonl \
