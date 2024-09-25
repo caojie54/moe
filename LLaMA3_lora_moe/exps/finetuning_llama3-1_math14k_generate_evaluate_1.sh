@@ -19,18 +19,18 @@ max_seq_len=300
 min_gen_len=120
 max_gen_len=200
 lora_rank=4
-lora_targets="Q,K,V,O"
-lora_alpha=8
-expert_num=6
+lora_targets="Q,K,V,O,FFN_DOWN"
+lora_alpha=32
+expert_num=4
 hydra_moe=True # hydra lora, Asymmetric LoRA
-blr=5e-4
+blr=1e-3
 flash_attention2=False
 bf16=True
 tag=""
 batch_size_gpu=8
 eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_lora_moe_s/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_lora_moe/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \

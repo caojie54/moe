@@ -1,4 +1,4 @@
-# export CUDA_VISIBLE_DEVICES="0,1"
+export CUDA_VISIBLE_DEVICES="0,1"
 
 # Count the number of devices
 num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
@@ -14,16 +14,16 @@ fi
 
 # train
 epochs=2
-dataset="math_14k"
-max_seq_len=300
-min_gen_len=120
-max_gen_len=200
+dataset="commonsense_170k"
+max_seq_len=200
+min_gen_len=10
+max_gen_len=40
 lora_rank=4
 lora_targets="Q,K,V,O"
-lora_alpha=8
+lora_alpha=32
 expert_num=6
 hydra_moe=True # hydra lora, Asymmetric LoRA
-blr=5e-4
+blr=1e-3
 flash_attention2=False
 bf16=True
 tag=""
@@ -60,7 +60,9 @@ python extract_adapter_from_checkpoint.py --checkpoint $checkpoint
 adapter_path="${output_dir}adapter.pth"
 
 
-test_dataset_l="AddSub AQuA gsm8k MultiArith SingleEq SVAMP"
+test_dataset_l="boolq piqa social_i_qa hellaswag winogrande ARC-Challenge ARC-Easy openbookqa"
+
+max_seq_len=600
 
 for test_dataset in $test_dataset_l
 do
@@ -70,6 +72,7 @@ torchrun --nproc_per_node $num_devices --master_port=3038 example.py \
     --adapter_path $adapter_path \
     --data_path ${path}/datasets/math_commonsense/${test_dataset}/test.json \
     --save_path $save_path \
+    --max_seq_len $max_seq_len \
     --max_gen_len $max_gen_len \
     --min_gen_len $min_gen_len \
     --max_batch_size 64 \
@@ -77,5 +80,5 @@ torchrun --nproc_per_node $num_devices --master_port=3038 example.py \
     --top_p 0.75
 done
 
-save_path1="${output_dir}AddSub_predict_mingen${min_gen_len}.jsonl"
-python evaluate_math.py --predict_file $save_path1
+save_path1="${output_dir}boolq_predict_mingen${min_gen_len}.jsonl"
+python evaluate_commonsense.py --predict_file $save_path1

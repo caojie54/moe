@@ -50,7 +50,7 @@ def setup_model_parallel() -> Tuple[int, int]:
     torch.manual_seed(1)
     return local_rank, world_size
 
-def load(llama_path, adapter_path: str, max_seq_len=None, max_batch_size: int = 32):
+def load(llama_path, adapter_path: str, max_batch_size: int = 32):
     start_time = time.time()
     # device="cuda" if torch.cuda.is_available() else "cpu"
     # load llama_adapter weights and model_cfg
@@ -60,9 +60,6 @@ def load(llama_path, adapter_path: str, max_seq_len=None, max_batch_size: int = 
     # adapter params
     with open(os.path.join(os.path.dirname(adapter_path), 'adapter_params.json'), 'r') as f:
         adapter_params = json.loads(f.read())
-    
-    if max_seq_len > adapter_params['max_seq_len']:
-        adapter_params['max_seq_len'] = max_seq_len
 
     adapter_params['max_batch_size'] = max_batch_size
     model_args: ModelArgs = ModelArgs(
@@ -104,7 +101,6 @@ def main(
     save_path:str,
     temperature: float = 0.1,
     top_p: float = 0.75,
-    max_seq_len = None,
     max_gen_len: int = 128,
     min_gen_len: int = 30,
     max_batch_size: int = 32,
@@ -113,7 +109,7 @@ def main(
     if local_rank > 0:
         sys.stdout = open(os.devnull, "w")
 
-    model = load(ckpt_dir, adapter_path, max_seq_len=max_seq_len, max_batch_size=max_batch_size)
+    model = load(ckpt_dir, adapter_path, max_batch_size)
     model.eval()
 
     ann = []
@@ -148,11 +144,10 @@ def main(
     # batchs = [ann[47:57]]
 
     # generate params
-    # with open(os.path.join(os.path.dirname(adapter_path), 'generate_params.json'), 'r') as f:
-    #     generate_params = json.loads(f.read())
-    #     max_seq_len = generate_params['max_seq_len']
-    max_seq_len = model.llama.params.max_seq_len
-    
+    with open(os.path.join(os.path.dirname(adapter_path), 'generate_params.json'), 'r') as f:
+        generate_params = json.loads(f.read())
+        max_seq_len = generate_params['max_seq_len']
+
     directory = os.path.dirname(save_path)
     if not os.path.exists(directory):
         os.makedirs(directory)
