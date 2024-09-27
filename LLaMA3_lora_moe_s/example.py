@@ -61,7 +61,7 @@ def load(llama_path, adapter_path: str, max_seq_len=None, max_batch_size: int = 
     with open(os.path.join(os.path.dirname(adapter_path), 'adapter_params.json'), 'r') as f:
         adapter_params = json.loads(f.read())
     
-    if max_seq_len > adapter_params['max_seq_len']:
+    if max_seq_len and (max_seq_len > adapter_params['max_seq_len']):
         adapter_params['max_seq_len'] = max_seq_len
 
     adapter_params['max_batch_size'] = max_batch_size

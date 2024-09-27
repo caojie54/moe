@@ -113,14 +113,12 @@ class MOELoraLayer(nn.Module):
         return self.params_num
 
 
-    def forward(self, x: torch.Tensor, type_weight: Optional[torch.Tensor]):
+    def forward(self, x: torch.Tensor):
         if self.expert_num == 1:
             return self.lora_B(self.lora_A(x)) * self.scaling
         
         # type_weight: [bsz, seqlen]
         route_weight = nn.functional.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # [bsz, seqlen, expert_num]
-        # lora type weight
-        route_weight = route_weight * type_weight.unsqueeze(-1)
 
         result = None
         for i in range(self.expert_num):
@@ -339,25 +337,6 @@ class Attention(nn.Module):
             if 'O' in self.lora_targets:
                 self.lora_O = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
             
-            self.lora_type = len(self.lora_targets)
-            self.lora_type_router = nn.Linear(args.dim, self.lora_type, bias=False)
-
-            # self.expert_weight = args.expert_weight
-            # if self.expert_weight:
-            #     type_param_num = []
-            #     if 'Q' in self.lora_targets:
-            #         type_param_num.append(self.lora_Q.params_count())
-            #     if 'K' in self.lora_targets:
-            #         type_param_num.append(self.lora_K.params_count())
-            #     if 'V' in self.lora_targets:
-            #         type_param_num.append(self.lora_V.params_count())
-            #     if 'O' in self.lora_targets:
-            #         type_param_num.append(self.lora_O.params_count())
-            #     # weight according to param number
-            #     with torch.no_grad():
-            #         type_weight_param = torch.FloatTensor(type_param_num)
-            #         self.type_weight_param = self.lora_type * nn.functional.softmax(type_weight_param, dim=-1, dtype=torch.float32)
-        
         self.w_prompt = w_prompt
         if self.w_prompt:
             self.prompt = nn.Embedding(args.expert_num * args.prompt_len, args.dim)
@@ -385,20 +364,13 @@ class Attention(nn.Module):
         bsz, seqlen, _ = x.shape
         xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
 
-        type_weight = self.lora_type * nn.functional.softmax(self.lora_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, loratype]
-        # if self.expert_weight:
-        #     type_weight = type_weight * self.type_weight_param.to(x).unsqueeze(0).unsqueeze(0)
-        type_idx = 0
         if self.w_lora:
             if 'Q' in self.lora_targets:
-                xq = xq + self.lora_Q(x, type_weight[:,:,type_idx])
-                type_idx += 1
+                xq = xq + self.lora_Q(x)
             if 'K' in self.lora_targets:
-                xk = xk + self.lora_K(x, type_weight[:,:,type_idx])
-                type_idx += 1
+                xk = xk + self.lora_K(x)
             if 'V' in self.lora_targets:
-                xv = xv + self.lora_V(x, type_weight[:,:,type_idx])
-                type_idx += 1
+                xv = xv + self.lora_V(x)
 
         xq = xq.view(bsz, seqlen, self.n_local_heads, self.head_dim)
         xk = xk.view(bsz, seqlen, self.n_local_kv_heads, self.head_dim)
@@ -476,7 +448,7 @@ class Attention(nn.Module):
             output = output + experts_output
 
         if self.w_lora and 'O' in self.lora_targets:
-            return self.wo(output) + self.lora_O(output, type_weight[:,:,type_idx])
+            return self.wo(output) + self.lora_O(output)
         else:
             return self.wo(output)
 

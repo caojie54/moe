@@ -18,44 +18,44 @@ dataset="math_14k"
 max_seq_len=300
 min_gen_len=120
 max_gen_len=200
-lora_rank=8
-lora_targets="Q,K,V,O,FFN_DOWN"
+lora_rank=4
+lora_targets="Q,K,V,O"
 lora_alpha=32
-expert_num=1
+expert_num=6
 hydra_moe=True # hydra lora, Asymmetric LoRA
-blr=1e-3
+blr=3e-3
 flash_attention2=False
 bf16=True
 tag=""
 batch_size_gpu=8
 eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_lora_moe/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_lora_moe_s/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
-# torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
-#     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
-#     --data_path ${path}/datasets/${dataset}/train.json \
-#     --lora_rank ${lora_rank} \
-#     --w_lora True \
-#     --lora_targets $lora_targets \
-#     --lora_alpha $lora_alpha \
-#     --expert_num $expert_num \
-#     --hydra_moe $hydra_moe \
-#     --max_seq_len $max_seq_len \
-#     --batch_size  $batch_size_gpu \
-#     --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \
-#     --epochs ${epochs} \
-#     --warmup_epochs 1 \
-#     --blr ${blr} \
-#     --flash_attention2 $flash_attention2 \
-#     --bf16 $bf16 \
-#     --weight_decay 0.02 \
-#     --output_dir $output_dir \
-#     --num_workers 10
+torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
+    --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
+    --data_path ${path}/datasets/${dataset}/train.json \
+    --lora_rank ${lora_rank} \
+    --w_lora True \
+    --lora_targets $lora_targets \
+    --lora_alpha $lora_alpha \
+    --expert_num $expert_num \
+    --hydra_moe $hydra_moe \
+    --max_seq_len $max_seq_len \
+    --batch_size  $batch_size_gpu \
+    --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \
+    --epochs ${epochs} \
+    --warmup_epochs 1 \
+    --blr ${blr} \
+    --flash_attention2 $flash_attention2 \
+    --bf16 $bf16 \
+    --weight_decay 0.02 \
+    --output_dir $output_dir \
+    --num_workers 10
 
-# checkpoint="${output_dir}checkpoint-$((epochs-1)).pth"
-# # get lora parameters
-# python extract_adapter_from_checkpoint.py --checkpoint $checkpoint
+checkpoint="${output_dir}checkpoint-$((epochs-1)).pth"
+# get lora parameters
+python extract_adapter_from_checkpoint.py --checkpoint $checkpoint
 
 adapter_path="${output_dir}adapter.pth"
 

@@ -13,8 +13,8 @@ if [ "$num_devices" -gt "$max_devices" ]; then
 fi
 
 # train
-epochs=3
-dataset="commonsense_15k"
+epochs=2
+dataset="commonsense_170k"
 max_seq_len=200
 min_gen_len=10
 max_gen_len=40
