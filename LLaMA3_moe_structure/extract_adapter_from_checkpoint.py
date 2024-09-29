@@ -32,7 +32,7 @@ def main(
     args = model.get('args')
     adapter_params = {}
     adapter_params['w_bias'] = args.w_bias
-    adapter_params['w_lora'] = args.w_lora
+    adapter_params['lora_layers'] = args.lora_layers
     adapter_params['lora_rank'] = args.lora_rank
     adapter_params['lora_targets'] = args.lora_targets
     adapter_params['lora_alpha'] = args.lora_alpha

@@ -32,7 +32,7 @@ class LLaMA_adapter(nn.Module):
             max_seq_len=args.max_seq_len,
             max_batch_size=args.max_batch_size,
             w_bias = args.w_bias,
-            w_lora = args.w_lora,
+            lora_layers = args.lora_layers,
             lora_rank = args.lora_rank,
             lora_targets = args.lora_targets,
             lora_alpha = args.lora_alpha,

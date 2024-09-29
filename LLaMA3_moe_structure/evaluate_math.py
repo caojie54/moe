@@ -68,6 +68,9 @@ def math_acc(predict_file):
                 f.write(json_data+'\n')
         result[dataset]= correct / total
         print(f'{dataset}: accuracy {correct}  {correct / total}')
+    
+    acc_l = result.values()
+    result['average'] = sum(acc_l)/len(acc_l)
     return result
     
 def main(predict_file:str):

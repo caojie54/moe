@@ -41,7 +41,7 @@ class ModelArgs:
 
     w_bias: bool = False # use bias tuning
     # lora
-    lora_layers: str = '0-8,24-32'
+    lora_layers: str = '0-0' # '0-8,24-32'
     lora_rank: int = 8
     lora_targets: str = 'Q,K,V,O,FFN_UP,FFN_DOWN'
     lora_alpha: float = 32
@@ -167,6 +167,7 @@ class PAdapterLayer(nn.Module):
         if self.expert_num ==1:
             nn.init.xavier_uniform_(self.down_proj.weight, gain=1e-4)
             nn.init.xavier_uniform_(self.up_proj.weight, gain=1e-4)
+            # nn.init.zeros_(self.up_proj.weight) # zero init like lora
             nn.init.constant_(self.down_proj.bias, 0.0)
             nn.init.constant_(self.up_proj.bias, 0.0)
         elif self.expert_num >1:
@@ -182,7 +183,7 @@ class PAdapterLayer(nn.Module):
                 # nn.init.zeros_(self.up_proj_l[i].weight) # zero init like lora
                 nn.init.constant_(self.up_proj_l[i].bias, 0.0)
 
-    def forward(self, x, type_weight: Optional[torch.Tensor]):
+    def forward(self, x):
         if self.expert_num == 1:
             x = self.down_proj(x)
             x = self.adapter_act_fn(x)
@@ -191,14 +192,13 @@ class PAdapterLayer(nn.Module):
 
         # type_weight: [bsz, seqlen]
         route_weight = nn.functional.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # [bsz, seqlen, expert_num]
-        route_weight = route_weight * type_weight.unsqueeze(-1)
 
         result = None
         for i in range(self.expert_num):
             if self.hydra:
                 tmp = torch.unsqueeze(route_weight[:,:,i], -1) * self.up_proj_l[i](self.adapter_act_fn(self.down_proj(x)))
             else:
-                tmp = torch.unsqueeze(route_weight[:,:,i], -1) * self.up_proj_l[i](self.adapter_act_fn(self.down_proj[i](x)))
+                tmp = torch.unsqueeze(route_weight[:,:,i], -1) * self.up_proj_l[i](self.adapter_act_fn(self.down_proj_l[i](x)))
             if i == 0:
                 result = tmp
             else:
@@ -422,9 +422,9 @@ class Attention(nn.Module):
         if self.w_prompt:
             if self.args.flash_attention2:
                 xq = xq.transpose(1, 2)
-            self.prompt = self.prompt.view(self.args.expert_num, self.args.prompt_len, self.args.dim)
-            prompt_k = self.wk(self.prompt).view(1, self.args.expert_num * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
-            prompt_v = self.wv(self.prompt).view(1, self.args.expert_num * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
+            prompt = self.prompt.weight.reshape(self.args.expert_num, self.args.prompt_len, self.args.dim)
+            prompt_k = self.wk(prompt).view(1, self.args.expert_num * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
+            prompt_v = self.wv(prompt).view(1, self.args.expert_num * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
 
             prompt_k = repeat_kv(prompt_k, self.n_rep) # [bs, expert_num * prompt_len, n_local_heads, head_dim]
             prompt_v = repeat_kv(prompt_v, self.n_rep)
@@ -526,7 +526,7 @@ class TransformerBlock(nn.Module):
 
         self.w_padapter = w_padapter
         if self.w_padapter:
-            self.p_adapter = PAdapterLayer(self.dim, args.p_adapter_size, args.expert_num)
+            self.p_adapter = PAdapterLayer(self.dim, args.p_adapter_size, args.expert_num, args.p_adapter_hydra)
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
 

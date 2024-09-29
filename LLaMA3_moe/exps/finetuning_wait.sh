@@ -25,12 +25,20 @@ while true; do
     if [ -n "$eligible_gpus" ]; then
         export CUDA_VISIBLE_DEVICES="$eligible_gpus"
         echo "Running command on GPUs: $CUDA_VISIBLE_DEVICES"
-        # bash ./exps/finetuning_QMsumgoldclean_generate_evaluate_3-1_4.sh
-        bash ./exps/finetuning_llama3-1_math14k_generate_evaluate.sh
-        bash ./exps/finetuning_llama3-1_math14k_generate_evaluate_1.sh
-        # bash ./exps/finetuning_llama3-1_math14k_generate_evaluate_2.sh
-        # bash ./exps/finetuning_llama3-1_math14k_generate_evaluate_3.sh
-        # bash ./exps/finetuning_llama3-1_math14k_generate_evaluate_4.sh
+        # bash ./exps/finetuning_llama3-1_math14k_generate_evaluate.sh
+        # bash ./exps/finetuning_llama3-1_prompt_math14k_generate_evaluate.sh
+        # bash ./exps/finetuning_llama3-1_prompt_moe_math14k_generate_evaluate.sh
+        # bash ./exps/finetuning_llama3-1_padapter_math14k_generate_evaluate.sh
+        # bash ./exps/finetuning_llama3-1_padapter_moe_math14k_generate_evaluate.sh
+        # bash ./exps/finetuning_llama3-1_padapter_moe_math14k_generate_evaluate_1.sh
+        bash ./exps/finetuning_llama3-1_padapter_commonsense15k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_padapter_moe_commonsense15k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_prompt_commonsense15k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_prompt_moe_commonsense15k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_padapter_commonsense170k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_padapter_moe_commonsense170k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_prompt_commonsense170k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_prompt_moe_commonsense170k_generate_evaluate.sh
         break
     else
         echo "No GPU with more than $memory GB unused memory."

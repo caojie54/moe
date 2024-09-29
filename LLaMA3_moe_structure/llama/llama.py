@@ -41,7 +41,7 @@ class ModelArgs:
 
     w_bias: bool = False # use bias tuning
     # lora
-    lora_layers: str = '0-8,24-32'
+    lora_layers: str = '0-0' # '0-8,24-32'
     lora_rank: int = 8
     lora_targets: str = 'Q,K,V,O,FFN_UP,FFN_DOWN'
     lora_alpha: float = 32
@@ -115,11 +115,15 @@ class MOELoraLayer(nn.Module):
 
     def forward(self, x: torch.Tensor, type_weight: Optional[torch.Tensor]):
         if self.expert_num == 1:
-            return self.lora_B(self.lora_A(x)) * self.scaling
+            result = self.lora_B(self.lora_A(x)) * self.scaling
+            
+            result = torch.unsqueeze(type_weight, -1) * result
+            return result
         
         # type_weight: [bsz, seqlen]
         route_weight = nn.functional.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # [bsz, seqlen, expert_num]
         # lora type weight
+        
         route_weight = route_weight * type_weight.unsqueeze(-1)
 
         result = None
@@ -189,10 +193,13 @@ class PAdapterLayer(nn.Module):
             x = self.down_proj(x)
             x = self.adapter_act_fn(x)
             x = self.up_proj(x)
+            
+            x = x * type_weight.unsqueeze(-1)
             return x 
 
         # type_weight: [bsz, seqlen]
         route_weight = nn.functional.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # [bsz, seqlen, expert_num]
+        
         route_weight = route_weight * type_weight.unsqueeze(-1)
 
         result = None
@@ -339,9 +346,6 @@ class Attention(nn.Module):
             if 'O' in self.lora_targets:
                 self.lora_O = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
             
-            self.lora_type = len(self.lora_targets)
-            self.lora_type_router = nn.Linear(args.dim, self.lora_type, bias=False)
-
             # self.expert_weight = args.expert_weight
             # if self.expert_weight:
             #     type_param_num = []
@@ -381,13 +385,10 @@ class Attention(nn.Module):
             ).cuda()
         return super().train(mode)
 
-    def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
+    def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor], type_weight:Optional[torch.Tensor]):
         bsz, seqlen, _ = x.shape
         xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
 
-        type_weight = self.lora_type * nn.functional.softmax(self.lora_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, loratype]
-        # if self.expert_weight:
-        #     type_weight = type_weight * self.type_weight_param.to(x).unsqueeze(0).unsqueeze(0)
         type_idx = 0
         if self.w_lora:
             if 'Q' in self.lora_targets:
@@ -450,9 +451,9 @@ class Attention(nn.Module):
         if self.w_prompt:
             if self.args.flash_attention2:
                 xq = xq.transpose(1, 2)
-            self.prompt = self.prompt.view(self.args.expert_num, self.args.prompt_len, self.args.dim)
-            prompt_k = self.wk(self.prompt).view(1, self.args.expert_num * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
-            prompt_v = self.wv(self.prompt).view(1, self.args.expert_num * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
+            prompt = self.prompt.weight.reshape(self.args.expert_num, self.args.prompt_len, self.args.dim)
+            prompt_k = self.wk(prompt).view(1, self.args.expert_num * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
+            prompt_v = self.wv(prompt).view(1, self.args.expert_num * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
 
             prompt_k = repeat_kv(prompt_k, self.n_rep) # [bs, expert_num * prompt_len, n_local_heads, head_dim]
             prompt_v = repeat_kv(prompt_v, self.n_rep)
@@ -471,7 +472,11 @@ class Attention(nn.Module):
             experts_output = experts_output.permute(0,3,2,1,4).contiguous().view(bsz,seqlen,self.args.expert_num, -1)
             if self.args.expert_num >1:
                 prompt_weight = nn.functional.softmax(self.prompt_router(x), dim=-1, dtype=torch.float32).to(x.dtype)
+                prompt_weight = prompt_weight * type_weight[:,:,type_idx].unsqueeze(-1)
                 experts_output = torch.sum(prompt_weight.unsqueeze(-1) * experts_output, 2, keepdim=True)
+            elif self.args.expert_num == 1:
+                experts_output = experts_output * type_weight[:,:,type_idx].unsqueeze(-1).unsqueeze(-1)
+            type_idx += 1
             experts_output = experts_output.squeeze(2)
             output = output + experts_output
 
@@ -520,15 +525,17 @@ class FeedForward(nn.Module):
             if 'FFN_DOWN' in self.lora_targets:
                 self.lora_DOWN = MOELoraLayer(hidden_dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
 
-    def forward(self, x):
+    def forward(self, x, type_weight:Optional[torch.Tensor]):
         if self.w_lora:
+            type_idx = 0
             if 'FFN_UP' in self.lora_targets:
-                out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x))
+                out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx]))
+                type_idx += 1
             else:
                 out = F.silu(self.w1(x)) * self.w3(x)
             
             if 'FFN_DOWN' in self.lora_targets:
-                out = self.w2(out) + self.lora_DOWN(out)
+                out = self.w2(out) + self.lora_DOWN(out, type_weight[:,:,type_idx])
             else:
                 out = self.w2(out)
             return out
@@ -554,17 +561,43 @@ class TransformerBlock(nn.Module):
 
         self.w_padapter = w_padapter
         if self.w_padapter:
-            self.p_adapter = PAdapterLayer(self.dim, args.p_adapter_size, args.expert_num)
+            self.p_adapter = PAdapterLayer(self.dim, args.p_adapter_size, args.expert_num, args.p_adapter_hydra)
+        
+        self.adapter_type = 0
+        self.attention_type = 0
+        self.FFN_type = 0
+        if w_lora:
+            lora_targets = args.lora_targets.split(',')
+            self.adapter_type += len(lora_targets)
+            attention_targets = ['Q', 'K', 'V', 'O']
+            FFN_targets = ['FFN_UP', 'FFN_DOWN']
+            for x in lora_targets:
+                if x in attention_targets:
+                    self.attention_type += 1
+                if x in FFN_targets:
+                    self.FFN_type += 1
+        if w_prompt:
+            self.adapter_type += 1
+            self.attention_type += 1
+        if w_padapter:
+            self.adapter_type += 1
+        
+        self.adapter_type_router = nn.Linear(args.dim, self.adapter_type)
+
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
 
-        h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask)
+        type_weights = self.adapter_type * nn.functional.softmax(self.adapter_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        type_idx = 0
+        h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask, type_weight=type_weights[:,:,type_idx:type_idx+self.attention_type])
         # out = h + self.feed_forward.forward(self.ffn_norm(h))
+        type_idx += self.attention_type
         residual = h
         h = self.ffn_norm(h)
-        out = self.feed_forward.forward(h)
+        out = self.feed_forward.forward(h, type_weight=type_weights[:,:,type_idx:type_idx+self.FFN_type])
+        type_idx += self.FFN_type
         if self.w_padapter:
-            adapter_states = self.p_adapter(h)
+            adapter_states = self.p_adapter(h, type_weight=type_weights[:,:,type_idx])
             out = out + adapter_states
         out = residual + out
 
