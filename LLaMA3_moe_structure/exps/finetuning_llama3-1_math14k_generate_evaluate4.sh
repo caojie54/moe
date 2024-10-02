@@ -21,19 +21,19 @@ max_gen_len=200
 
 lora_layers="0-32"
 lora_rank=4
-lora_targets="Q,K,V,O,FFN_DOWN"
-lora_alpha=8
+lora_targets="Q,K,V,O"
+lora_alpha=32
 hydra_moe=True # hydra lora, Asymmetric LoRA
-expert_num=2
+expert_num=4
 
-p_adapter_layers="16-32"
+p_adapter_layers="24-32"
 p_adapter_size=16
 p_adapter_hydra=True
 
-prompt_layers="16-32"
+prompt_layers="24-32"
 prompt_len=10
 
-blr=6e-3
+blr=1e-3
 flash_attention2=False
 bf16=True
 tag=""
