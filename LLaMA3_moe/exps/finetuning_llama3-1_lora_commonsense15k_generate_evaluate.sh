@@ -20,34 +20,29 @@ min_gen_len=10
 max_gen_len=40
 
 lora_layers="0-32"
-lora_rank=8
+lora_rank=16
 lora_targets="Q,K,V,O,FFN_DOWN"
-lora_alpha=8
+lora_alpha=16
 hydra_moe=True # hydra lora, Asymmetric LoRA
 expert_num=1
 
-p_adapter_layers="0-32"
+p_adapter_layers="0-0"
 p_adapter_size=16
 p_adapter_hydra=True
 
-prompt_layers="0-32"
+prompt_layers="0-0"
 prompt_len=10
 
-lora_path="/home2/caojie/outputs/LLaMA3-1_moe/commonsense_170k/b32_epoch2_warme1_loralayers0-32_lorar8_loraQ,K,V,O,FFN_DOWN_alpha8_expertnum1_hydraTrue_padapter_layers0-0_padaptersize16_padapterhydraTrue_prompt_layers0-0_prompt_len10_blr1e-3_maxseq200_flashatt2False_bf16True_/adapter.pth"
-p_adapter_path="/home2/caojie/outputs/LLaMA3-1_moe/commonsense_170k/b32_epoch2_warme1_padapter_layers0-32_padaptersize16_padapterhydraTrue_expertnum1_blr6e-3_maxseq200_flashatt2False_bf16True_/adapter.pth"
-prompt_path="/home2/caojie/outputs/LLaMA3-1_moe/commonsense_170k/b32_epoch2_warme1_prompt_layers0-32_prompt_len10_expertnum1_blr6e-3_maxseq200_flashatt2False_bf16True_/adapter.pth"
-router_only=False
-
-blr=1e-3
+blr=6e-3
 flash_attention2=False
 bf16=True
-tag="sigmoid_swiRouter"
+tag=""
 batch_size_gpu=8
 eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_moe_structure_finetune/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_routeronly${router_only}_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_padapterhydra${p_adapter_hydra}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_moe/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_padapterhydra${p_adapter_hydra}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
-torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
+torchrun --nproc_per_node $num_devices --master_port=3031 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --data_path ${path}/datasets/${dataset}/train.json \
     --expert_num $expert_num \
@@ -61,10 +56,6 @@ torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --p_adapter_hydra $p_adapter_hydra \
     --prompt_layers $prompt_layers\
     --prompt_len $prompt_len \
-    --lora_path $lora_path \
-    --p_adapter_path $p_adapter_path \
-    --prompt_path $prompt_path \
-    --router_only $router_only \
     --max_seq_len $max_seq_len \
     --batch_size  $batch_size_gpu \
     --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \
@@ -91,7 +82,7 @@ max_seq_len=600
 for test_dataset in $test_dataset_l
 do
 save_path="${output_dir}${test_dataset}_predict_mingen${min_gen_len}.jsonl"
-torchrun --nproc_per_node $num_devices --master_port=3038 example.py \
+torchrun --nproc_per_node $num_devices --master_port=3031 example.py \
     --ckpt_dir ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --adapter_path $adapter_path \
     --data_path ${path}/datasets/math_commonsense/${test_dataset}/test.json \

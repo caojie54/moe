@@ -37,6 +37,7 @@ class LLaMA_adapter(nn.Module):
             lora_targets = args.lora_targets,
             lora_alpha = args.lora_alpha,
             expert_num = args.expert_num,
+            swi_x= args.swi_x,
             hydra_moe = args.hydra_moe,
             p_adapter_layers = args.p_adapter_layers,
             p_adapter_size = args.p_adapter_size,

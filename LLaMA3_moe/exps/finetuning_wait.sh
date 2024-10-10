@@ -25,8 +25,13 @@ while true; do
     if [ -n "$eligible_gpus" ]; then
         export CUDA_VISIBLE_DEVICES="$eligible_gpus"
         echo "Running command on GPUs: $CUDA_VISIBLE_DEVICES"
-        bash ./exps/finetuning_llama3-1_commonsense170k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_math14k_generate_evaluate.sh
+        # bash ./exps/finetuning_llama3-1_commonsense170k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate.sh
+        # bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate1.sh
+        # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate.sh
+        # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate1.sh
+        # bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_prompt_math14k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_prompt_moe_math14k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_padapter_math14k_generate_evaluate.sh

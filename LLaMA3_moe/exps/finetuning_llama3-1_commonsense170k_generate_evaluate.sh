@@ -22,7 +22,7 @@ max_gen_len=40
 lora_layers="0-32"
 lora_rank=8
 lora_targets="Q,K,V,O,FFN_DOWN"
-lora_alpha=8
+lora_alpha=32
 hydra_moe=True # hydra lora, Asymmetric LoRA
 expert_num=1
 

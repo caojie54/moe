@@ -58,6 +58,8 @@ class ModelArgs:
 
     # moe
     expert_num: int = 1
+
+    swi_x: int = 0 # 0 is normal Linear, 
     
     expert_weight: bool= False # weight by expert param number
 
@@ -214,6 +216,33 @@ class PAdapterLayer(nn.Module):
                 result = result + tmp
         return result
 
+
+class Router(nn.Module):
+    def __init__(
+        self,
+        in_dim: int,
+        hidden_dim: int,
+        out_dim: int 
+    ):
+        super().__init__()
+
+        self.w1 = Linear(
+            in_dim, hidden_dim
+        )
+        self.w2 = Linear(
+            hidden_dim, out_dim
+        )
+        self.w3 = Linear(
+            in_dim, hidden_dim
+        )
+        
+        nn.init.constant_(self.w1.bias.data, 0)
+        nn.init.constant_(self.w2.bias.data, 0)
+        nn.init.constant_(self.w3.bias.data, 0)
+    
+    def forward(self, x):
+        return self.w2(F.silu(self.w1(x)) * self.w3(x))
+    
 
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
@@ -582,12 +611,16 @@ class TransformerBlock(nn.Module):
         if w_padapter:
             self.adapter_type += 1
         
-        self.adapter_type_router = nn.Linear(args.dim, self.adapter_type)
+        if args.swi_x == 0:
+            self.adapter_type_router = nn.Linear(args.dim, self.adapter_type)
+        elif args.swi_x > 0:
+            self.adapter_type_router = Router(args.dim, self.adapter_type * args.swi_x, self.adapter_type)
 
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
 
-        type_weights = self.adapter_type * nn.functional.softmax(self.adapter_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        # type_weights = self.adapter_type * nn.functional.softmax(self.adapter_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
         type_idx = 0
         h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask, type_weight=type_weights[:,:,type_idx:type_idx+self.attention_type])
         # out = h + self.feed_forward.forward(self.ffn_norm(h))

@@ -37,6 +37,7 @@ def main(
     adapter_params['lora_targets'] = args.lora_targets
     adapter_params['lora_alpha'] = args.lora_alpha
     adapter_params['expert_num'] = args.expert_num
+    adapter_params['swi_x'] = args.swi_x
     adapter_params['hydra_moe'] = args.hydra_moe
     adapter_params['p_adapter_layers'] = args.p_adapter_layers
     adapter_params['p_adapter_size'] = args.p_adapter_size

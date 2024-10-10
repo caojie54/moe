@@ -20,23 +20,23 @@ min_gen_len=10
 max_gen_len=40
 
 lora_layers="0-32"
-lora_rank=4
-lora_targets="Q,K,V,O"
+lora_rank=8
+lora_targets="Q,K,V,O,FFN_DOWN"
 lora_alpha=8
 hydra_moe=True # hydra lora, Asymmetric LoRA
-expert_num=6
+expert_num=1
 
-p_adapter_layers="30-32"
+p_adapter_layers="0-0"
 p_adapter_size=16
 p_adapter_hydra=True
 
-prompt_layers="30-32"
+prompt_layers="0-0"
 prompt_len=10
 
 blr=6e-3
 flash_attention2=False
 bf16=True
-tag=""
+tag="sigmoid"
 batch_size_gpu=8
 eff_batch_size=32
 path="/home2/caojie"

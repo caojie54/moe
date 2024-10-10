@@ -62,6 +62,9 @@ def get_args_parser():
     parser.add_argument('--p_adapter_size', default=16, type=int, help='')
     parser.add_argument('--p_adapter_hydra', type=str2bool, nargs='?', const=True, default=False, help='p_adapter_hydra')
 
+    # adapter type router
+    parser.add_argument('--swi_x', default=0, type=int, help='adapters type router, 0 is normal Linear, otherwise swi_x * adapter_type is hiddensize of SwiGLU router')
+
     # Optimizer parameters
     parser.add_argument('--weight_decay', type=float, default=0.05,
                         help='weight decay (default: 0.05)')

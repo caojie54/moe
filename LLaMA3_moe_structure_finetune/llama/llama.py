@@ -217,6 +217,33 @@ class PAdapterLayer(nn.Module):
         return result
 
 
+class Router(nn.Module):
+    def __init__(
+        self,
+        in_dim: int,
+        hidden_dim: int,
+        out_dim: int 
+    ):
+        super().__init__()
+
+        self.w1 = Linear(
+            in_dim, hidden_dim
+        )
+        self.w2 = Linear(
+            hidden_dim, out_dim
+        )
+        self.w3 = Linear(
+            in_dim, hidden_dim
+        )
+        
+        nn.init.constant_(self.w1.bias.data, 0)
+        nn.init.constant_(self.w2.bias.data, 0)
+        nn.init.constant_(self.w3.bias.data, 0)
+    
+    def forward(self, x):
+        return self.w2(F.silu(self.w1(x)) * self.w3(x))
+
+
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
         super().__init__()
@@ -584,7 +611,8 @@ class TransformerBlock(nn.Module):
         if w_padapter:
             self.adapter_type += 1
         
-        self.adapter_type_router = nn.Linear(args.dim, self.adapter_type)
+        # self.adapter_type_router = nn.Linear(args.dim, self.adapter_type)
+        self.adapter_type_router = Router(args.dim, self.adapter_type*4, self.adapter_type)
 
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):

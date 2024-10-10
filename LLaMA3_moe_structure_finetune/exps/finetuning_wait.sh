@@ -28,7 +28,7 @@ while true; do
         bash ./exps/finetuning_llama3-1_commonsense15k_generate_evaluate.sh
         bash ./exps/finetuning_llama3-1_commonsense15k_generate_evaluate1.sh
         bash ./exps/finetuning_llama3-1_commonsense170k_generate_evaluate.sh
-        bash ./exps/finetuning_llama3-1_commonsense170k_generate_evaluate1.sh
+        # bash ./exps/finetuning_llama3-1_commonsense170k_generate_evaluate1.sh
         # bash ./exps/finetuning_llama3-1_math14k_generate_evaluate5.sh
         break
     else
