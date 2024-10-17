@@ -5,7 +5,7 @@ num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=2
+max_devices=1
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -20,11 +20,11 @@ min_gen_len=120
 max_gen_len=200
 
 lora_layers="0-32"
-lora_rank=16
+lora_rank=8
 lora_targets="Q,K,V,O,FFN_DOWN"
-lora_alpha=16
+lora_alpha=8
 hydra_moe=True # hydra lora, Asymmetric LoRA
-expert_num=1
+expert_num=4
 
 p_adapter_layers="0-0"
 p_adapter_size=16
