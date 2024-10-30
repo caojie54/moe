@@ -1,11 +1,11 @@
-# export CUDA_VISIBLE_DEVICES="0,1"
+export CUDA_VISIBLE_DEVICES="4,5,6,7"
 
 # Count the number of devices
 num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=2
+max_devices=4
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -27,9 +27,9 @@ blr=1e-3
 flash_attention2=False
 bf16=True
 tag=""
-batch_size_gpu=8
+batch_size_gpu=2
 eff_batch_size=32
-path="/home2/caojie"
+path="/mnt/caojie/caojie"
 output_dir="${path}/outputs/LLaMA3-1_lora_moe_s/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
