@@ -10,6 +10,8 @@ from torch import nn
 from torch.nn import Embedding, Linear
 import torch.nn.functional as F
 
+from .sparse_moe import SparseLoRAMoE
+
 from flash_attn import flash_attn_func
 from transformers.utils import (
     is_flash_attn_2_available,
@@ -45,8 +47,7 @@ class ModelArgs:
     lora_rank: int = 8
     lora_targets: str = 'Q,K,V,O,FFN_UP,FFN_DOWN'
     lora_alpha: float = 32
-    hydra_moe: bool = False # hydra lora, Asymmetric LoRA
-
+    
     # parallel adapter
     p_adapter_layers: str='0-0'
     p_adapter_size: int = 16
@@ -58,80 +59,10 @@ class ModelArgs:
 
     # moe
     expert_num: int = 1
+    top_k: int = 1
+    noisy_router: bool = True
     
     expert_weight: bool= False # weight by expert param number
-
-
-class MOELoraLayer(nn.Module):
-    def __init__(self, input_dim, output_dim, r, expert_num, lora_alpha:float=8, hydra=False):
-        super().__init__()
-
-        self.expert_num = expert_num
-        self.hydra = hydra # hydra lora
-        self.scaling = lora_alpha / r
-        self.params_num = 0
-
-        if expert_num == 1:
-            self.lora_A = nn.Linear(input_dim, r, bias=False)
-            self.lora_B = nn.Linear(r, output_dim, bias=False)
-            nn.init.zeros_(self.lora_B.weight)
-
-        elif expert_num > 1: # moe
-            self.router = nn.Linear(input_dim, expert_num, bias=False)
-            if hydra:
-                self.lora_A = nn.Linear(input_dim, r, bias=False)
-            else:
-                self.lora_A_l = nn.ModuleList()
-                for i in range(expert_num):
-                    self.lora_A_l.append(nn.Linear(input_dim, r, bias=False))
-                
-            self.lora_B_l = nn.ModuleList()
-            for i in range(expert_num):
-                self.lora_B_l.append(nn.Linear(r, output_dim, bias=False))
-
-            # initial lora B to zeros
-            for linear in self.lora_B_l:
-                nn.init.zeros_(linear.weight)
-        else:
-            raise Exception("The number of Experts is wrong")
-    
-    def params_count(self):
-        self.params_num = 0
-        if self.expert_num == 1:
-            self.params_num += torch.numel(self.lora_A.weight)
-            self.params_num += torch.numel(self.lora_B.weight)
-
-        elif self.expert_num > 1: # moe
-            if self.hydra:
-                self.params_num += torch.numel(self.lora_A.weight)
-            else:
-                for i in range(self.expert_num):
-                    self.params_num += torch.numel(self.lora_A_l[i].weight)
-                
-            for i in range(self.expert_num):
-                self.params_num += torch.numel(self.lora_B_l[i].weight)
-        return self.params_num
-
-
-    def forward(self, x: torch.Tensor):
-        if self.expert_num == 1:
-            return self.lora_B(self.lora_A(x)) * self.scaling
-        
-        # type_weight: [bsz, seqlen]
-        route_weight = nn.functional.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # [bsz, seqlen, expert_num]
-
-        result = None
-        for i in range(self.expert_num):
-            if self.hydra:
-                tmp = torch.unsqueeze(route_weight[:,:,i], -1) * self.lora_B_l[i](self.lora_A(x)) * self.scaling
-            else:
-                tmp = torch.unsqueeze(route_weight[:,:,i], -1) * self.lora_B_l[i](self.lora_A_l[i](x)) * self.scaling
-            if i == 0:
-                result = tmp
-            else:
-                result = result + tmp
-        return result
-
 
 class PAdapterLayer(nn.Module):
     def __init__(self, hidden_size, adapter_size, expert_num:int=1, hydra:bool=False):
@@ -329,13 +260,13 @@ class Attention(nn.Module):
         if self.w_lora:
             self.lora_targets = args.lora_targets.split(',')
             if 'Q' in self.lora_targets:
-                self.lora_Q = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_Q = SparseLoRAMoE(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
             if 'K' in self.lora_targets:
-                self.lora_K = MOELoraLayer(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_K = SparseLoRAMoE(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
             if 'V' in self.lora_targets:
-                self.lora_V = MOELoraLayer(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_V = SparseLoRAMoE(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
             if 'O' in self.lora_targets:
-                self.lora_O = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_O = SparseLoRAMoE(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
             
         self.w_prompt = w_prompt
         if self.w_prompt:
@@ -487,10 +418,10 @@ class FeedForward(nn.Module):
         if self.w_lora:
             self.lora_targets = args.lora_targets.split(',')
             if 'FFN_UP' in self.lora_targets:
-                self.lora_UP = MOELoraLayer(args.dim, hidden_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_UP = SparseLoRAMoE(args.dim, hidden_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
 
             if 'FFN_DOWN' in self.lora_targets:
-                self.lora_DOWN = MOELoraLayer(hidden_dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_DOWN = SparseLoRAMoE(hidden_dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
 
     def forward(self, x):
         if self.w_lora:

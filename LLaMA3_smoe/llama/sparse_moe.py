@@ -5,44 +5,46 @@ from torch.nn import functional as F
 
 #noisy top-k gating
 class NoisyTopkRouter(nn.Module):
-    def __init__(self, n_embed, num_experts, top_k):
+    def __init__(self, n_embed, num_experts, top_k, noisy=False):
         super(NoisyTopkRouter, self).__init__()
         self.top_k = top_k
         #layer for router logits
         self.topkroute_linear = nn.Linear(n_embed, num_experts)
-        self.noise_linear =nn.Linear(n_embed, num_experts)
+        self.noisy = noisy
+        if self.noisy:
+            self.noise_linear =nn.Linear(n_embed, num_experts)
 
 
     def forward(self, x: torch.Tensor):
         # mh_ouput is the output tensor from multihead self attention block
         logits = self.topkroute_linear(x)
+        if self.noisy:
+            #Noise logits
+            noise_logits = self.noise_linear(x)
+            #Adding scaled unit gaussian noise to the logits
+            noise = torch.randn_like(logits)*F.softplus(noise_logits)
+            logits = logits + noise
 
-        #Noise logits
-        noise_logits = self.noise_linear(x)
-
-        #Adding scaled unit gaussian noise to the logits
-        noise = torch.randn_like(logits)*F.softplus(noise_logits)
-        noisy_logits = logits + noise
-
-        # top_k_logits, indices = noisy_logits.topk(self.top_k, dim=-1) # topk first, then softmax
-        # zeros = torch.full_like(noisy_logits, float('-inf'))
+        # top_k_logits, indices = logits.topk(self.top_k, dim=-1) # topk first, then softmax
+        # zeros = torch.full_like(logits, float('-inf'))
         # sparse_logits = zeros.scatter(-1, indices, top_k_logits) # 
         # router_output = F.softmax(sparse_logits, dim=-1)
 
         # to use the softmax logits compute load_balancing loss
-        softmax_logits = F.softmax(noisy_logits, dim=-1)
-        top_k_logits, indices = softmax_logits.topk(self.top_k, dim=-1)
+        softmax_logits = F.softmax(logits, dim=-1)
+        top_k_logits, selected_experts = softmax_logits.topk(self.top_k, dim=-1)
         weighted_top_k_logits = top_k_logits / torch.sum(top_k_logits, dim=-1, keepdim=True, dtype=x.dtype)
-        return weighted_top_k_logits, indices, softmax_logits
+        return weighted_top_k_logits, selected_experts, softmax_logits
 
 
 #Now create the sparse mixture of experts module
 class SparseLoRAMoE(nn.Module):
-    def __init__(self, n_embed, num_experts, top_k, lora_r, lora_alpha):
+    def __init__(self, input_dim, output_dim, lora_r, num_experts, lora_alpha, top_k, noisy=False):
         super(SparseLoRAMoE, self).__init__()
-        self.router = NoisyTopkRouter(n_embed, num_experts, top_k)
-        self.experts = nn.ModuleList([LoraLayer(n_embed, n_embed, lora_r, lora_alpha) for _ in range(num_experts)])
+        self.router = NoisyTopkRouter(input_dim, num_experts, top_k, noisy=noisy)
+        self.experts = nn.ModuleList([LoraLayer(input_dim, output_dim, lora_r, lora_alpha) for _ in range(num_experts)])
         self.top_k = top_k
+        self.output_dim = output_dim
 
     def get_lb_loss(self, gate_logits: torch.Tensor, selected_experts: torch.Tensor) -> torch.Tensor:
         """
@@ -56,35 +58,28 @@ class SparseLoRAMoE(nn.Module):
         layer_loss = num_experts * torch.sum(expert_fractions * expert_probs)
         return layer_loss
 
-    def forward(self, x):
-        gating_output, indices, softmax_logits = self.router(x)
-        final_output = torch.zeros_like(x)
+    def forward(self, x:torch.Tensor):
 
         # Reshape inputs for batch processing
         flat_x = x.view(-1, x.size(-1))
-        flat_gating_output = gating_output.view(-1, gating_output.size(-1))
 
-        # Process each expert in parallel
+        weighted_top_k_logits, selected_experts, softmax_logits = self.router(flat_x)
+        # flat_gating_output = gating_output.view(-1, gating_output.size(-1))
+
+        results = torch.zeros_like(self.experts[0](flat_x)) # todo:  fix 
+        # results = torch.zeros(flat_x.shape[0]*flat_x.shape[1], self.output_dim, dtype=x.dtype, device=x.device, requires_grad=True) # todo:  fix 
+
         for i, expert in enumerate(self.experts):
-            # Create a mask for the inputs where the current expert is in top-k
-            expert_mask = (indices == i).any(dim=-1)
-            flat_mask = expert_mask.view(-1)
+            batch_idx, nth_expert = torch.where(selected_experts == i)
+            results[batch_idx] += \
+                weighted_top_k_logits[batch_idx, nth_expert, None] * expert(flat_x[batch_idx])
 
-            if flat_mask.any():
-                expert_input = flat_x[flat_mask]
-                expert_output = expert(expert_input)
+        results = results.view((*x.shape[:-1], results.shape[-1]))
 
-                # Extract and apply gating scores
-                gating_scores = flat_gating_output[flat_mask, i].unsqueeze(1)
-                weighted_output = expert_output * gating_scores
-
-                # Update final output additively by indexing and adding
-                final_output[expert_mask] += weighted_output.squeeze(1)
-        
         if self.training:
-            self.load_balancing_loss = self.get_lb_loss(gate_logits=softmax_logits.view(-1, softmax_logits.size(-1)), selected_experts=indices)
+            self.load_balancing_loss = self.get_lb_loss(gate_logits=softmax_logits, selected_experts=selected_experts)
 
-        return final_output
+        return results
     
 
 

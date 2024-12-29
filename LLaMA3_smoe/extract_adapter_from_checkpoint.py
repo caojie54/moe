@@ -36,14 +36,20 @@ def main(
     adapter_params['lora_rank'] = args.lora_rank
     adapter_params['lora_targets'] = args.lora_targets
     adapter_params['lora_alpha'] = args.lora_alpha
+
     adapter_params['expert_num'] = args.expert_num
-    adapter_params['hydra_moe'] = args.hydra_moe
+    adapter_params['noisy_router'] = args.noisy_router
+    adapter_params['top_k'] = args.top_k
+
     adapter_params['p_adapter_layers'] = args.p_adapter_layers
     adapter_params['p_adapter_size'] = args.p_adapter_size
     adapter_params['p_adapter_hydra'] = args.p_adapter_hydra
+
     adapter_params['prompt_layers'] = args.prompt_layers
     adapter_params['prompt_len'] = args.prompt_len
+
     adapter_params['expert_weight'] = args.expert_weight
+    
     adapter_params['max_seq_len'] = args.max_seq_len
     adapter_params['flash_attention2'] = args.flash_attention2
     adapter_params['bf16'] = args.bf16

@@ -52,7 +52,8 @@ def get_args_parser():
     parser.add_argument('--lora_alpha', default=8, type=int, help='lora alpha')
     # expert
     parser.add_argument('--expert_num', default=1, type=int, help='number of experts')
-    parser.add_argument('--hydra_moe', type=str2bool, nargs='?', const=True, default=False, help='hydra moe')
+    parser.add_argument('--top_k', default=1, type=int, help='top k experts in sparse moe ')
+    parser.add_argument('--noisy_router', type=str2bool, nargs='?', const=True, default=False, help='noisy_router')
     parser.add_argument('--expert_weight', type=str2bool, nargs='?', const=True, default=False, help='type weight for expert by expert params count ')
     # prompt
     parser.add_argument('--prompt_layers', default='0-0', type=str, help="")
