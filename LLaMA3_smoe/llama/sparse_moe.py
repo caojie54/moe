@@ -25,11 +25,6 @@ class NoisyTopkRouter(nn.Module):
             noise = torch.randn_like(logits)*F.softplus(noise_logits)
             logits = logits + noise
 
-        # top_k_logits, indices = logits.topk(self.top_k, dim=-1) # topk first, then softmax
-        # zeros = torch.full_like(logits, float('-inf'))
-        # sparse_logits = zeros.scatter(-1, indices, top_k_logits) # 
-        # router_output = F.softmax(sparse_logits, dim=-1)
-
         # to use the softmax logits compute load_balancing loss
         softmax_logits = F.softmax(logits, dim=-1)
         top_k_logits, selected_experts = softmax_logits.topk(self.top_k, dim=-1)
@@ -64,10 +59,9 @@ class SparseLoRAMoE(nn.Module):
         flat_x = x.view(-1, x.size(-1))
 
         weighted_top_k_logits, selected_experts, softmax_logits = self.router(flat_x)
-        # flat_gating_output = gating_output.view(-1, gating_output.size(-1))
 
-        results = torch.zeros_like(self.experts[0](flat_x)) # todo:  fix 
-        # results = torch.zeros(flat_x.shape[0]*flat_x.shape[1], self.output_dim, dtype=x.dtype, device=x.device, requires_grad=True) # todo:  fix 
+        # results = torch.zeros_like(self.experts[0](flat_x)) # todo:  fix 
+        results = torch.zeros(x.shape[0]*x.shape[1], self.output_dim, dtype=x.dtype, device=x.device)
 
         for i, expert in enumerate(self.experts):
             batch_idx, nth_expert = torch.where(selected_experts == i)
