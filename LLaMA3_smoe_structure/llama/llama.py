@@ -10,8 +10,6 @@ from torch import nn
 from torch.nn import Embedding, Linear
 import torch.nn.functional as F
 
-from .sparse_moe import SparseLoRAMoE
-
 from flash_attn import flash_attn_func
 from transformers.utils import (
     is_flash_attn_2_available,
@@ -47,7 +45,8 @@ class ModelArgs:
     lora_rank: int = 8
     lora_targets: str = 'Q,K,V,O,FFN_UP,FFN_DOWN'
     lora_alpha: float = 32
-    
+    # hydra_moe: bool = False # hydra lora, Asymmetric LoRA
+
     # parallel adapter
     p_adapter_layers: str='0-0'
     p_adapter_size: int = 16
@@ -57,86 +56,110 @@ class ModelArgs:
     prompt_layers: str='0-0'
     prompt_len: int = 10
 
-    # moe
-    expert_num: int = 1
-    top_k: int = 1
-    noisy_router: bool = True
-    lb_loss_coeff: float = 0.001
+    # sparse structure moe
+    max_threshold: float = 0.5
+    bool_weights: bool= False
+
+    swi_x: int = 0 # 0 is normal Linear, 
     
     expert_weight: bool= False # weight by expert param number
 
+
+class MOELoraLayer(nn.Module):
+    def __init__(self, input_dim, output_dim, r, lora_alpha:float=8):
+        super().__init__()
+        self.scaling = lora_alpha / r
+        self.params_num = 0
+
+        self.lora_A = nn.Linear(input_dim, r, bias=False)
+        self.lora_B = nn.Linear(r, output_dim, bias=False)
+        nn.init.zeros_(self.lora_B.weight)
+
+        self.output_dim = output_dim
+    
+    def params_count(self):
+        self.params_num = 0
+    
+        self.params_num += torch.numel(self.lora_A.weight)
+        self.params_num += torch.numel(self.lora_B.weight)
+
+        return self.params_num
+
+    def forward(self, x: torch.Tensor, type_weight: Optional[torch.Tensor]):
+        # type_weight: [bsz, seqlen]
+        results = torch.zeros(x.shape[0], x.shape[1], self.output_dim, dtype=x.dtype, device=x.device) # [bsz, seqlen, output_dim]
+
+        batch_idx = torch.where(type_weight)
+
+        selected_x = x[batch_idx] # [m, dim] ,m tokens selected for this expert
+        selected_x = self.lora_B(self.lora_A(selected_x)) * self.scaling
+
+        if len(batch_idx[0])>0:
+            results[batch_idx] += type_weight[batch_idx, None] * selected_x
+        
+        return results
+
+
 class PAdapterLayer(nn.Module):
-    def __init__(self, hidden_size, adapter_size, expert_num:int=1, hydra:bool=False):
+    def __init__(self, hidden_size, adapter_size):
         super(PAdapterLayer, self).__init__()
         self.hidden_size = hidden_size
         self.adapter_size = adapter_size
-        self.expert_num = expert_num
-        self.hydra = hydra
 
         self.adapter_act_fn = nn.SiLU()
 
-        if expert_num == 1:
-            self.down_proj = nn.Linear(hidden_size, adapter_size)
-            self.up_proj = nn.Linear(adapter_size, hidden_size)
-        elif expert_num > 1: # moe
-            self.router = nn.Linear(hidden_size, expert_num)
-            if hydra:
-                self.down_proj = nn.Linear(hidden_size, adapter_size)
-            else:
-                self.down_proj_l = nn.ModuleList()
-                for i in range(expert_num):
-                    self.down_proj_l.append(nn.Linear(hidden_size, adapter_size))
-                
-            self.up_proj_l = nn.ModuleList()
-            for i in range(expert_num):
-                self.up_proj_l.append(nn.Linear(adapter_size, hidden_size))
-        else:
-            raise Exception("The number of Experts is wrong")
+        self.down_proj = nn.Linear(hidden_size, adapter_size)
+        self.up_proj = nn.Linear(adapter_size, hidden_size)
         
         self.reset_parameters()
 
     def reset_parameters(self):
-        if self.expert_num ==1:
-            nn.init.xavier_uniform_(self.down_proj.weight, gain=1e-4)
-            nn.init.xavier_uniform_(self.up_proj.weight, gain=1e-4)
-            # nn.init.zeros_(self.up_proj.weight) # zero init like lora
-            nn.init.constant_(self.down_proj.bias, 0.0)
-            nn.init.constant_(self.up_proj.bias, 0.0)
-        elif self.expert_num >1:
-            if self.hydra:
-                nn.init.xavier_uniform_(self.down_proj.weight, gain=1e-4)
-                nn.init.constant_(self.down_proj.bias, 0.0)
-            else:
-                for i in range(self.expert_num):
-                    nn.init.xavier_uniform_(self.down_proj_l[i].weight, gain=1e-4)
-                    nn.init.constant_(self.down_proj_l[i].bias, 0.0)
-            for i in range(self.expert_num):
-                nn.init.xavier_uniform_(self.up_proj_l[i].weight, gain=1e-4)
-                # nn.init.zeros_(self.up_proj_l[i].weight) # zero init like lora
-                nn.init.constant_(self.up_proj_l[i].bias, 0.0)
+        nn.init.xavier_uniform_(self.down_proj.weight, gain=1e-4)
+        nn.init.xavier_uniform_(self.up_proj.weight, gain=1e-4)
+        nn.init.constant_(self.down_proj.bias, 0.0)
+        nn.init.constant_(self.up_proj.bias, 0.0)
 
-    def forward(self, x):
-        if self.expert_num == 1:
-            x = self.down_proj(x)
-            x = self.adapter_act_fn(x)
-            x = self.up_proj(x)
-            return x 
-
+    def forward(self, x, type_weight: Optional[torch.Tensor]):
         # type_weight: [bsz, seqlen]
-        route_weight = nn.functional.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # [bsz, seqlen, expert_num]
+        results = torch.zeros_like(x) # [bsz, seqlen, dim]
 
-        result = None
-        for i in range(self.expert_num):
-            if self.hydra:
-                tmp = torch.unsqueeze(route_weight[:,:,i], -1) * self.up_proj_l[i](self.adapter_act_fn(self.down_proj(x)))
-            else:
-                tmp = torch.unsqueeze(route_weight[:,:,i], -1) * self.up_proj_l[i](self.adapter_act_fn(self.down_proj_l[i](x)))
-            if i == 0:
-                result = tmp
-            else:
-                result = result + tmp
-        return result
+        batch_idx = torch.where(type_weight)
 
+        selected_x = x[batch_idx] # [m, dim] ,m tokens selected for this expert
+        selected_x = self.up_proj(self.adapter_act_fn(self.down_proj(selected_x)))
+
+        if len(batch_idx[0])>0:
+            results[batch_idx] += type_weight[batch_idx].unsqueeze(-1) * selected_x
+
+        return results
+
+
+class Router(nn.Module):
+    def __init__(
+        self,
+        in_dim: int,
+        hidden_dim: int,
+        out_dim: int 
+    ):
+        super().__init__()
+
+        self.w1 = Linear(
+            in_dim, hidden_dim
+        )
+        self.w2 = Linear(
+            hidden_dim, out_dim
+        )
+        self.w3 = Linear(
+            in_dim, hidden_dim
+        )
+        
+        nn.init.constant_(self.w1.bias.data, 0)
+        nn.init.constant_(self.w2.bias.data, 0)
+        nn.init.constant_(self.w3.bias.data, 0)
+    
+    def forward(self, x):
+        return self.w2(F.silu(self.w1(x)) * self.w3(x))
+    
 
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
@@ -261,20 +284,34 @@ class Attention(nn.Module):
         if self.w_lora:
             self.lora_targets = args.lora_targets.split(',')
             if 'Q' in self.lora_targets:
-                self.lora_Q = SparseLoRAMoE(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_Q = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
             if 'K' in self.lora_targets:
-                self.lora_K = SparseLoRAMoE(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_K = MOELoraLayer(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
             if 'V' in self.lora_targets:
-                self.lora_V = SparseLoRAMoE(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_V = MOELoraLayer(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
             if 'O' in self.lora_targets:
-                self.lora_O = SparseLoRAMoE(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_O = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
             
+            # self.expert_weight = args.expert_weight
+            # if self.expert_weight:
+            #     type_param_num = []
+            #     if 'Q' in self.lora_targets:
+            #         type_param_num.append(self.lora_Q.params_count())
+            #     if 'K' in self.lora_targets:
+            #         type_param_num.append(self.lora_K.params_count())
+            #     if 'V' in self.lora_targets:
+            #         type_param_num.append(self.lora_V.params_count())
+            #     if 'O' in self.lora_targets:
+            #         type_param_num.append(self.lora_O.params_count())
+            #     # weight according to param number
+            #     with torch.no_grad():
+            #         type_weight_param = torch.FloatTensor(type_param_num)
+            #         self.type_weight_param = self.lora_type * nn.functional.softmax(type_weight_param, dim=-1, dtype=torch.float32)
+        
         self.w_prompt = w_prompt
         if self.w_prompt:
-            self.prompt = nn.Embedding(args.expert_num * args.prompt_len, args.dim)
+            self.prompt = nn.Embedding(args.prompt_len, args.dim)
             self.prompt_gate = torch.nn.Parameter(torch.zeros(1, self.n_local_heads, 1, 1))
-            if self.args.expert_num >1:
-                self.prompt_router = nn.Linear(args.dim, self.args.expert_num)
                 
         self.cache_k = None
         self.cache_v = None
@@ -292,17 +329,21 @@ class Attention(nn.Module):
             ).cuda()
         return super().train(mode)
 
-    def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
+    def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor], type_weight:Optional[torch.Tensor]):
         bsz, seqlen, _ = x.shape
         xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
 
+        type_idx = 0
         if self.w_lora:
             if 'Q' in self.lora_targets:
-                xq = xq + self.lora_Q(x)
+                xq = xq + self.lora_Q(x, type_weight[:,:,type_idx])
+                type_idx += 1
             if 'K' in self.lora_targets:
-                xk = xk + self.lora_K(x)
+                xk = xk + self.lora_K(x, type_weight[:,:,type_idx])
+                type_idx += 1
             if 'V' in self.lora_targets:
-                xv = xv + self.lora_V(x)
+                xv = xv + self.lora_V(x, type_weight[:,:,type_idx])
+                type_idx += 1
 
         xq = xq.view(bsz, seqlen, self.n_local_heads, self.head_dim)
         xk = xk.view(bsz, seqlen, self.n_local_kv_heads, self.head_dim)
@@ -354,33 +395,36 @@ class Attention(nn.Module):
         if self.w_prompt:
             if self.args.flash_attention2:
                 xq = xq.transpose(1, 2)
-            prompt = self.prompt.weight.reshape(self.args.expert_num, self.args.prompt_len, self.args.dim)
-            prompt_k = self.wk(prompt).view(1, self.args.expert_num * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
-            prompt_v = self.wv(prompt).view(1, self.args.expert_num * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
 
-            prompt_k = repeat_kv(prompt_k, self.n_rep) # [bs, expert_num * prompt_len, n_local_heads, head_dim]
+            # sparse computing can not work for prompt-tuning, using non-sparse way
+
+            type_weight_prompt = type_weight[:,:,type_idx] 
+
+            prompt = self.prompt.weight
+            prompt_k = self.wk(prompt).view(1, self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
+            prompt_v = self.wv(prompt).view(1, self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
+
+            prompt_k = repeat_kv(prompt_k, self.n_rep) # [bs, prompt_len, n_local_heads, head_dim]
             prompt_v = repeat_kv(prompt_v, self.n_rep)
 
             prompt_k = prompt_k.transpose(1, 2)
-            prompt_v = prompt_v.transpose(1, 2) # [bs, n_local_heads, expert_num * prompt_len, head_dim]
+            prompt_v = prompt_v.transpose(1, 2) # [bs, n_local_heads, prompt_len, head_dim]
 
-            prompt_scores = torch.matmul(xq, prompt_k.transpose(2, 3)) / math.sqrt(self.head_dim) # [bs, n_local_heads, seqlen, expert_num * prompt_len]
+            prompt_scores = torch.matmul(xq, prompt_k.transpose(2, 3)) / math.sqrt(self.head_dim) # [bs, n_local_heads, seqlen, prompt_len]
             
             prompt_scores = self.prompt_gate * F.softmax(prompt_scores.float(), dim=-1).type_as(xq)
-
-            prompt_scores = prompt_scores.view(bsz, self.n_local_heads, -1, self.args.expert_num, self.args.prompt_len).transpose(2,3)
-            prompt_v = prompt_v.view(bsz, self.n_local_heads, self.args.expert_num, self.args.prompt_len, self.head_dim)
             
-            experts_output = torch.matmul(prompt_scores, prompt_v) # [bsz, local_heads, expertnum, seqlen, head_dim]
-            experts_output = experts_output.permute(0,3,2,1,4).contiguous().view(bsz,seqlen,self.args.expert_num, -1)
-            if self.args.expert_num >1:
-                prompt_weight = nn.functional.softmax(self.prompt_router(x), dim=-1, dtype=torch.float32).to(x.dtype)
-                experts_output = torch.sum(prompt_weight.unsqueeze(-1) * experts_output, 2, keepdim=True)
-            experts_output = experts_output.squeeze(2)
-            output = output + experts_output
+            prompt_output = torch.matmul(prompt_scores, prompt_v) # [bsz, local_heads, seqlen, head_dim]
+            prompt_output = prompt_output.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
+
+            prompt_output = prompt_output * type_weight_prompt.unsqueeze(-1)
+            
+            output = output + prompt_output
+
+            type_idx += 1
 
         if self.w_lora and 'O' in self.lora_targets:
-            return self.wo(output) + self.lora_O(output)
+            return self.wo(output) + self.lora_O(output, type_weight[:,:,type_idx])
         else:
             return self.wo(output)
 
@@ -419,20 +463,22 @@ class FeedForward(nn.Module):
         if self.w_lora:
             self.lora_targets = args.lora_targets.split(',')
             if 'FFN_UP' in self.lora_targets:
-                self.lora_UP = SparseLoRAMoE(args.dim, hidden_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_UP = MOELoraLayer(args.dim, hidden_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
 
             if 'FFN_DOWN' in self.lora_targets:
-                self.lora_DOWN = SparseLoRAMoE(hidden_dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_DOWN = MOELoraLayer(hidden_dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
 
-    def forward(self, x):
+    def forward(self, x, type_weight:Optional[torch.Tensor]):
         if self.w_lora:
+            type_idx = 0
             if 'FFN_UP' in self.lora_targets:
-                out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x))
+                out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx]))
+                type_idx += 1
             else:
                 out = F.silu(self.w1(x)) * self.w3(x)
             
             if 'FFN_DOWN' in self.lora_targets:
-                out = self.w2(out) + self.lora_DOWN(out)
+                out = self.w2(out) + self.lora_DOWN(out, type_weight[:,:,type_idx])
             else:
                 out = self.w2(out)
             return out
@@ -459,21 +505,62 @@ class TransformerBlock(nn.Module):
         self.w_padapter = w_padapter
         if self.w_padapter:
             self.p_adapter = PAdapterLayer(self.dim, args.p_adapter_size, args.expert_num, args.p_adapter_hydra)
+        
+        self.adapter_type = 0
+        self.attention_type = 0
+        self.FFN_type = 0
+        if w_lora:
+            lora_targets = args.lora_targets.split(',')
+            self.adapter_type += len(lora_targets)
+            attention_targets = ['Q', 'K', 'V', 'O']
+            FFN_targets = ['FFN_UP', 'FFN_DOWN']
+            for x in lora_targets:
+                if x in attention_targets:
+                    self.attention_type += 1
+                if x in FFN_targets:
+                    self.FFN_type += 1
+        if w_prompt:
+            self.adapter_type += 1
+            self.attention_type += 1
+        if w_padapter:
+            self.adapter_type += 1
+        
+        if args.swi_x == 0:
+            self.adapter_type_router = nn.Linear(args.dim, self.adapter_type)
+        elif args.swi_x > 0:
+            self.adapter_type_router = Router(args.dim, self.adapter_type * args.swi_x, self.adapter_type)
+        
+        self.threshold_fn = nn.Linear(args.dim, 1)
+        self.max_threshold = args.max_threshold
+        self.bool_weights = args.bool_weights
+
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
 
-        h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask)
+        # type_weights = self.adapter_type * nn.functional.softmax(self.adapter_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        thresholds = F.sigmoid(self.threshold_fn(x)) * self.max_threshold # [bsz, seqlen, 1]
+        adapted_type_weights = type_weights - thresholds
+        selected_experts = torch.ge(adapted_type_weights, 0).to(torch.float)
+
+        if self.bool_weights: # disard experts that weights less than threshold or use 0,1 by selected_experts
+            type_weights = selected_experts
+        else:
+            type_weights = type_weights * selected_experts 
+
+        type_idx = 0
+        h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask, type_weight=type_weights[:,:,type_idx:type_idx+self.attention_type])
         # out = h + self.feed_forward.forward(self.ffn_norm(h))
+        type_idx += self.attention_type
         residual = h
         h = self.ffn_norm(h)
-        out = self.feed_forward.forward(h)
+        out = self.feed_forward.forward(h, type_weight=type_weights[:,:,type_idx:type_idx+self.FFN_type])
+        type_idx += self.FFN_type
         if self.w_padapter:
-            adapter_states = self.p_adapter(h)
+            adapter_states = self.p_adapter(h, type_weight=type_weights[:,:,type_idx])
             out = out + adapter_states
         out = residual + out
 
-        if not self.bf16:
-            out = out.clamp(min=-65500, max=65500)
         return out
 
 

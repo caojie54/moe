@@ -31,6 +31,8 @@ while true; do
         # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate.sh
         bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate.sh
+        # bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate1.sh
+        # bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate2.sh
         # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate1.sh
         # bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_prompt_math14k_generate_evaluate.sh

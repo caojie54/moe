@@ -27,7 +27,7 @@ lora_alpha=8
 expert_num=8
 top_k=2
 noisy_router=False
-lb_loss_coeff=0.1
+lb_loss_coeff=0.01
 
 p_adapter_layers="0-0"
 p_adapter_size=16
