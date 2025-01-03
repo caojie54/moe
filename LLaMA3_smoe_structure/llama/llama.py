@@ -284,13 +284,13 @@ class Attention(nn.Module):
         if self.w_lora:
             self.lora_targets = args.lora_targets.split(',')
             if 'Q' in self.lora_targets:
-                self.lora_Q = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_Q = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.lora_alpha)
             if 'K' in self.lora_targets:
-                self.lora_K = MOELoraLayer(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_K = MOELoraLayer(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.lora_alpha)
             if 'V' in self.lora_targets:
-                self.lora_V = MOELoraLayer(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_V = MOELoraLayer(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.lora_alpha)
             if 'O' in self.lora_targets:
-                self.lora_O = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_O = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.lora_alpha)
             
             # self.expert_weight = args.expert_weight
             # if self.expert_weight:
@@ -463,10 +463,10 @@ class FeedForward(nn.Module):
         if self.w_lora:
             self.lora_targets = args.lora_targets.split(',')
             if 'FFN_UP' in self.lora_targets:
-                self.lora_UP = MOELoraLayer(args.dim, hidden_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_UP = MOELoraLayer(args.dim, hidden_dim, args.lora_rank, args.lora_alpha)
 
             if 'FFN_DOWN' in self.lora_targets:
-                self.lora_DOWN = MOELoraLayer(hidden_dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
+                self.lora_DOWN = MOELoraLayer(hidden_dim, args.dim, args.lora_rank, args.lora_alpha)
 
     def forward(self, x, type_weight:Optional[torch.Tensor]):
         if self.w_lora:
@@ -504,7 +504,7 @@ class TransformerBlock(nn.Module):
 
         self.w_padapter = w_padapter
         if self.w_padapter:
-            self.p_adapter = PAdapterLayer(self.dim, args.p_adapter_size, args.expert_num, args.p_adapter_hydra)
+            self.p_adapter = PAdapterLayer(self.dim, args.p_adapter_size)
         
         self.adapter_type = 0
         self.attention_type = 0
