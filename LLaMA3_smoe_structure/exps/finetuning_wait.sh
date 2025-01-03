@@ -2,7 +2,7 @@
 # export TIKTOKEN_CACHE_DIR="/mnt/caojie/caojie/cache"
 # Loop indefinitely
 # gpu memory need
-memory=45
+memory=23
 while true; do
     echo "Checking at $(date)"  # Print the current time
     

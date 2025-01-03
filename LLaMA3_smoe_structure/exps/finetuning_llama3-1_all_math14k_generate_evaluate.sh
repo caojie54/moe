@@ -41,7 +41,7 @@ bf16=True
 tag="sigmoid"
 batch_size_gpu=8
 eff_batch_size=32
-path="/home2/caojie"
+path="/mnt/caojie/caojie"
 output_dir="${path}/outputs/LLaMA3-1_smoe_structure/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_max_threshold${max_threshold}_bool_weights${bool_weights}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_padapterhydra${p_adapter_hydra}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_swi_x${swi_x}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
