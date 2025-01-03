@@ -95,7 +95,7 @@ class MOELoraLayer(nn.Module):
         selected_x = self.lora_B(self.lora_A(selected_x)) * self.scaling
 
         if len(batch_idx[0])>0:
-            results[batch_idx] += type_weight[batch_idx, None] * selected_x
+            results[batch_idx] += type_weight[batch_idx].unsqueeze(-1) * selected_x
         
         return results
 
