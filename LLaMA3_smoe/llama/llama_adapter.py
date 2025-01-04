@@ -40,6 +40,7 @@ class LLaMA_adapter(nn.Module):
 
             expert_num = args.expert_num,
             top_k= args.top_k,
+            adamole = args.adamole,
             noisy_router= args.noisy_router,
             lb_loss_coeff= args.lb_loss_coeff,
 
@@ -144,9 +145,9 @@ class LLaMA_adapter(nn.Module):
             # assert self.llama.vocab_size == 32000
             c_loss = self.criterion(output.reshape(-1, self.llama.vocab_size), labels.flatten())
         
-        # load balancing loss
-        lb_loss = self.get_aux_loss()
-        c_loss += self.model_args.lb_loss_coeff * lb_loss
+            # load balancing loss
+            lb_loss = self.get_aux_loss()
+            c_loss += self.model_args.lb_loss_coeff * lb_loss
         return c_loss, c_loss
 
     @torch.inference_mode()

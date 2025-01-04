@@ -10,7 +10,7 @@ from torch import nn
 from torch.nn import Embedding, Linear
 import torch.nn.functional as F
 
-from .sparse_moe import SparseLoRAMoE
+from .sparse_moe import SparseLoRAMoE, AdaMoLE
 
 from flash_attn import flash_attn_func
 from transformers.utils import (
@@ -62,6 +62,7 @@ class ModelArgs:
     top_k: int = 1
     noisy_router: bool = True
     lb_loss_coeff: float = 0.001
+    adamole: bool = False
     
     expert_weight: bool= False # weight by expert param number
 
@@ -257,17 +258,22 @@ class Attention(nn.Module):
             nn.init.constant_(self.wq.bias.data, 0)
             nn.init.constant_(self.wo.bias.data, 0)
 
+        if args.adamole:
+            LoRAMoE = AdaMoLE
+        else:
+            LoRAMoE = SparseLoRAMoE
+
         self.w_lora = w_lora
         if self.w_lora:
             self.lora_targets = args.lora_targets.split(',')
             if 'Q' in self.lora_targets:
-                self.lora_Q = SparseLoRAMoE(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_Q = LoRAMoE(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
             if 'K' in self.lora_targets:
-                self.lora_K = SparseLoRAMoE(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_K = LoRAMoE(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
             if 'V' in self.lora_targets:
-                self.lora_V = SparseLoRAMoE(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_V = LoRAMoE(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
             if 'O' in self.lora_targets:
-                self.lora_O = SparseLoRAMoE(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_O = LoRAMoE(args.dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
             
         self.w_prompt = w_prompt
         if self.w_prompt:
@@ -415,14 +421,20 @@ class FeedForward(nn.Module):
             nn.init.constant_(self.w1.bias.data, 0)
             nn.init.constant_(self.w2.bias.data, 0)
             nn.init.constant_(self.w3.bias.data, 0)
+        
+        if args.adamole:
+            LoRAMoE = AdaMoLE
+        else:
+            LoRAMoE = SparseLoRAMoE
+
         self.w_lora = w_lora
         if self.w_lora:
             self.lora_targets = args.lora_targets.split(',')
             if 'FFN_UP' in self.lora_targets:
-                self.lora_UP = SparseLoRAMoE(args.dim, hidden_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_UP = LoRAMoE(args.dim, hidden_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
 
             if 'FFN_DOWN' in self.lora_targets:
-                self.lora_DOWN = SparseLoRAMoE(hidden_dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
+                self.lora_DOWN = LoRAMoE(hidden_dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.top_k, noisy=args.noisy_router)
 
     def forward(self, x):
         if self.w_lora:

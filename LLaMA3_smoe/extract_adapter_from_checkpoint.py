@@ -40,6 +40,7 @@ def main(
     adapter_params['expert_num'] = args.expert_num
     adapter_params['noisy_router'] = args.noisy_router
     adapter_params['top_k'] = args.top_k
+    adapter_params['adamole'] = args.adamole
     adapter_params['lb_loss_coeff'] = args.lb_loss_coeff
 
     adapter_params['p_adapter_layers'] = args.p_adapter_layers

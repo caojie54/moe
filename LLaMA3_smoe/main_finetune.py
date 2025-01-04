@@ -53,6 +53,7 @@ def get_args_parser():
     # expert
     parser.add_argument('--expert_num', default=1, type=int, help='number of experts')
     parser.add_argument('--top_k', default=1, type=int, help='top k experts in sparse moe ')
+    parser.add_argument('--adamole', default=False, type=bool, help='adamole(threshold_fn) or top_k')
     parser.add_argument('--lb_loss_coeff', default=0.001, type=float, help='load balancing loss coefficient')
     parser.add_argument('--noisy_router', type=str2bool, nargs='?', const=True, default=False, help='noisy_router')
     parser.add_argument('--expert_weight', type=str2bool, nargs='?', const=True, default=False, help='type weight for expert by expert params count ')
