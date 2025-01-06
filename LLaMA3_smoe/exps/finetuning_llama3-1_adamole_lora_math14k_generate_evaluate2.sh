@@ -13,8 +13,8 @@ if [ "$num_devices" -gt "$max_devices" ]; then
 fi
 
 # train
-epochs=3
-warmup_epochs=1
+epochs=1
+warmup_epochs=0.4
 dataset="math_14k"
 max_seq_len=300
 min_gen_len=120
@@ -27,13 +27,13 @@ lora_alpha=8
 
 expert_num=8
 adamole=True
-noisy_router=True
-lb_loss_coeff=0.001
+noisy_router=False
+lb_loss_coeff=0
 
 blr=6e-3
 flash_attention2=False
 bf16=True
-tag=""
+tag="1"
 batch_size_gpu=2
 eff_batch_size=32
 path="/home2/caojie"
