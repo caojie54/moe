@@ -9,12 +9,14 @@ import torch
 from torch import nn
 from torch.nn import Embedding, Linear
 import torch.nn.functional as F
+from auto_adapter import AUTOAdapterLayer
 
 from flash_attn import flash_attn_func
 from transformers.utils import (
     is_flash_attn_2_available,
     is_flash_attn_greater_or_equal_2_10,
 )
+
 if is_flash_attn_2_available() and is_flash_attn_greater_or_equal_2_10():
     print("------ flash attention2 enable -----")
 else:
@@ -45,7 +47,6 @@ class ModelArgs:
     lora_rank: int = 8
     lora_targets: str = 'Q,K,V,O,FFN_UP,FFN_DOWN'
     lora_alpha: float = 32
-    # hydra_moe: bool = False # hydra lora, Asymmetric LoRA
 
     # parallel adapter
     p_adapter_layers: str='0-0'
@@ -60,79 +61,17 @@ class ModelArgs:
     max_threshold: float = 0.5
     bool_weights: bool= False
 
+    ## structure router
     swi_x: int = 0 # 0 is normal Linear, 
+
+    ## moe 
+    num_experts: int = 1 # moe when num_experts > 1
+    moe_type: str = 'adamole' # adamole, topk
+    top_k: int = 2 # top_k experts in topk moe
+    noisy_router: bool = False # moe router
+    lb_loss: bool = False # moe load balancing loss
+    asym: bool = False #  Asymmetric structure for  LoRA and Parallel adapter
     
-    expert_weight: bool= False # weight by expert param number
-
-
-class MOELoraLayer(nn.Module):
-    def __init__(self, input_dim, output_dim, r, lora_alpha:float=8):
-        super().__init__()
-        self.scaling = lora_alpha / r
-        self.params_num = 0
-
-        self.lora_A = nn.Linear(input_dim, r, bias=False)
-        self.lora_B = nn.Linear(r, output_dim, bias=False)
-        nn.init.zeros_(self.lora_B.weight)
-
-        self.output_dim = output_dim
-    
-    def params_count(self):
-        self.params_num = 0
-    
-        self.params_num += torch.numel(self.lora_A.weight)
-        self.params_num += torch.numel(self.lora_B.weight)
-
-        return self.params_num
-
-    def forward(self, x: torch.Tensor, type_weight: Optional[torch.Tensor]):
-        # type_weight: [bsz, seqlen]
-        results = torch.zeros(x.shape[0], x.shape[1], self.output_dim, dtype=x.dtype, device=x.device) # [bsz, seqlen, output_dim]
-
-        batch_idx = torch.where(type_weight)
-
-        selected_x = x[batch_idx] # [m, dim] ,m tokens selected for this expert
-        selected_x = self.lora_B(self.lora_A(selected_x)) * self.scaling
-
-        if len(batch_idx[0])>0:
-            results[batch_idx] += type_weight[batch_idx].unsqueeze(-1) * selected_x
-        
-        return results
-
-
-class PAdapterLayer(nn.Module):
-    def __init__(self, hidden_size, adapter_size):
-        super(PAdapterLayer, self).__init__()
-        self.hidden_size = hidden_size
-        self.adapter_size = adapter_size
-
-        self.adapter_act_fn = nn.SiLU()
-
-        self.down_proj = nn.Linear(hidden_size, adapter_size)
-        self.up_proj = nn.Linear(adapter_size, hidden_size)
-        
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        nn.init.xavier_uniform_(self.down_proj.weight, gain=1e-4)
-        nn.init.xavier_uniform_(self.up_proj.weight, gain=1e-4)
-        nn.init.constant_(self.down_proj.bias, 0.0)
-        nn.init.constant_(self.up_proj.bias, 0.0)
-
-    def forward(self, x, type_weight: Optional[torch.Tensor]):
-        # type_weight: [bsz, seqlen]
-        results = torch.zeros_like(x) # [bsz, seqlen, dim]
-
-        batch_idx = torch.where(type_weight)
-
-        selected_x = x[batch_idx] # [m, dim] ,m tokens selected for this expert
-        selected_x = self.up_proj(self.adapter_act_fn(self.down_proj(selected_x)))
-
-        if len(batch_idx[0])>0:
-            results[batch_idx] += type_weight[batch_idx].unsqueeze(-1) * selected_x
-
-        return results
-
 
 class Router(nn.Module):
     def __init__(
