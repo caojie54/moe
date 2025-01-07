@@ -44,27 +44,37 @@ def get_args_parser():
     parser.add_argument('--flash_attention2', type=str2bool, nargs='?', const=True, default=False, help='flash attention 2')
     parser.add_argument('--bf16', type=str2bool, nargs='?', const=True, default=False, help='bf16 if GPU support')
 
+    # sparse structure moe
+    parser.add_argument('--max_threshold', default=0.5, type=float, help='max_threshold for selecting experts')
+    parser.add_argument('--bool_weights', type=str2bool, nargs='?', const=True, default=False, help='bool_weights for structure weight')
+
+    ## adapter type router
+    parser.add_argument('--swi_x', default=0, type=int, help='adapters type router, 0 is normal Linear, otherwise swi_x * adapter_type is hiddensize of SwiGLU router')
+
+    ## moe 
+    parser.add_argument('--num_experts', default=1, type=int, help='using moe when num_experts > 1')
+    parser.add_argument("--moe_type", default="lora", type=str, help="adamole, topk")
+    parser.add_argument('--top_k', default=2, type=int, help='top_k experts in topk moe')
+    parser.add_argument('--noisy_router', type=str2bool, nargs='?', const=True, default=False, help='noisy_router')
+    parser.add_argument('--lb_loss', type=str2bool, nargs='?', const=True, default=False, help='moe load balancing loss')
+    parser.add_argument('--lb_loss_coeff', default=0, type=float, help='moe load balancing loss coefficient')
+    parser.add_argument('--asym', type=str2bool, nargs='?', const=True, default=False, help='Asymmetric structure for  LoRA and Parallel adapter')
+
     # lora
     parser.add_argument('--w_bias', default=False, type=bool, help='bias tuning')
     parser.add_argument('--lora_layers', default='0-0', type=str, help="")
     parser.add_argument('--lora_rank', default=16, type=int, help='lora rank')
     parser.add_argument('--lora_targets', default='Q,V', type=str, help="Q,K,V,O,FFN_UP,FFN_DOWN")
     parser.add_argument('--lora_alpha', default=8, type=int, help='lora alpha')
-    parser.add_argument('--max_threshold', default=0.5, type=float, help='max_threshold for selecting experts')
-    parser.add_argument('--bool_weights', type=str2bool, nargs='?', const=True, default=False, help='bool_weights for structure weight')
-    parser.add_argument('--expert_weight', type=str2bool, nargs='?', const=True, default=False, help='type weight for expert by expert params count ')
 
     # prompt
     parser.add_argument('--prompt_layers', default='0-0', type=str, help="")
     parser.add_argument('--prompt_len', default=10, type=int, help='')
+
     # parallel adapter
     parser.add_argument('--p_adapter_layers', default='0-0', type=str, help="")
     parser.add_argument('--p_adapter_size', default=16, type=int, help='')
-    parser.add_argument('--p_adapter_hydra', type=str2bool, nargs='?', const=True, default=False, help='p_adapter_hydra')
-
-    # adapter type router
-    parser.add_argument('--swi_x', default=0, type=int, help='adapters type router, 0 is normal Linear, otherwise swi_x * adapter_type is hiddensize of SwiGLU router')
-
+    
     # Optimizer parameters
     parser.add_argument('--weight_decay', type=float, default=0.05,
                         help='weight decay (default: 0.05)')

@@ -32,19 +32,30 @@ class LLaMA_adapter(nn.Module):
             max_seq_len=args.max_seq_len,
             max_batch_size=args.max_batch_size,
             w_bias = args.w_bias,
+
             lora_layers = args.lora_layers,
             lora_rank = args.lora_rank,
             lora_targets = args.lora_targets,
             lora_alpha = args.lora_alpha,
-            max_threshold = args.max_threshold,
-            bool_weights = args.bool_weights,
-            swi_x= args.swi_x,
+            
             p_adapter_layers = args.p_adapter_layers,
             p_adapter_size = args.p_adapter_size,
-            p_adapter_hydra = args.p_adapter_hydra,
+            
             prompt_layers = args.prompt_layers,
             prompt_len = args.prompt_len,
-            expert_weight = args.expert_weight,
+            
+            max_threshold = args.max_threshold,
+            bool_weights = args.bool_weights,
+            swi_x = args.swi_x,
+
+            num_experts = args.num_experts,
+            moe_type = args.moe_type,
+            top_k = args.top_k,
+            noisy_router = args.noisy_router,
+            lb_loss = args.lb_loss,
+            lb_loss_coeff = args.lb_loss_coeff,
+            asym = args.asym,
+
             flash_attention2=args.flash_attention2,
             bf16=bf16,
             **params
@@ -83,6 +94,22 @@ class LLaMA_adapter(nn.Module):
         for name, param in self.named_parameters():
             if param.requires_grad:
                print(f"Trainable param: {name}, {param.shape}, {param.dtype}")
+
+
+    def get_aux_loss(self) -> torch.Tensor:
+        """
+        Get the load balancing loss for the whole model
+        """
+        # lb_loss = torch.tensor(0, dtype=torch.float).to(self.llama.device)
+        lb_loss = torch.tensor(0, dtype=torch.float).cuda()
+
+        for name, module in self.llama.named_modules():
+            if hasattr(module, 'get_lb_loss'):
+                load_balancing_loss = module.load_balancing_loss
+                lb_loss += load_balancing_loss
+
+        return lb_loss
+    
 
     def get_trainable_params(self):
         for name, para in self.named_parameters():
@@ -123,6 +150,10 @@ class LLaMA_adapter(nn.Module):
         else:
             # assert self.llama.vocab_size == 32000
             c_loss = self.criterion(output.reshape(-1, self.llama.vocab_size), labels.flatten())
+            # load balancing loss
+            if self.model_args.lb_loss:
+                lb_loss = self.get_aux_loss()
+                c_loss += self.model_args.lb_loss_coeff * lb_loss
 
         return c_loss, c_loss
 

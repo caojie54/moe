@@ -9,7 +9,7 @@ import torch
 from torch import nn
 from torch.nn import Embedding, Linear
 import torch.nn.functional as F
-from auto_adapter import AUTOAdapterLayer
+from .auto_adapter import AUTOAdapterLayer
 
 from flash_attn import flash_attn_func
 from transformers.utils import (
@@ -51,7 +51,6 @@ class ModelArgs:
     # parallel adapter
     p_adapter_layers: str='0-0'
     p_adapter_size: int = 16
-    p_adapter_hydra: bool = False
 
     # prompt
     prompt_layers: str='0-0'
@@ -70,6 +69,7 @@ class ModelArgs:
     top_k: int = 2 # top_k experts in topk moe
     noisy_router: bool = False # moe router
     lb_loss: bool = False # moe load balancing loss
+    lb_loss_coeff: float = 0
     asym: bool = False #  Asymmetric structure for  LoRA and Parallel adapter
     
 
@@ -223,34 +223,24 @@ class Attention(nn.Module):
         if self.w_lora:
             self.lora_targets = args.lora_targets.split(',')
             if 'Q' in self.lora_targets:
-                self.lora_Q = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.lora_alpha)
+                self.lora_Q = AUTOAdapterLayer(num_experts=args.num_experts, moe_type=args.moe_type, top_k=args.top_k, expert_type='lora', noisy_router=args.noisy_router,\
+                                                lb_loss=args.lb_loss, asym=args.asym, input_dim=args.dim, output_dim=args.dim, lora_r=args.lora_rank, lora_alpha=args.lora_alpha)
             if 'K' in self.lora_targets:
-                self.lora_K = MOELoraLayer(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.lora_alpha)
+                self.lora_K = AUTOAdapterLayer(num_experts=args.num_experts, moe_type=args.moe_type, top_k=args.top_k, expert_type='lora', noisy_router=args.noisy_router, \
+                                                lb_loss=args.lb_loss, asym=args.asym, input_dim=args.dim, output_dim=args.n_kv_heads * self.head_dim, lora_r=args.lora_rank, lora_alpha=args.lora_alpha)
             if 'V' in self.lora_targets:
-                self.lora_V = MOELoraLayer(args.dim, args.n_kv_heads * self.head_dim, args.lora_rank, args.lora_alpha)
+                self.lora_V = AUTOAdapterLayer(num_experts=args.num_experts, moe_type=args.moe_type, top_k=args.top_k, expert_type='lora', noisy_router=args.noisy_router, \
+                                                lb_loss=args.lb_loss, asym=args.asym, input_dim=args.dim, output_dim=args.n_kv_heads * self.head_dim, lora_r=args.lora_rank, lora_alpha=args.lora_alpha)
             if 'O' in self.lora_targets:
-                self.lora_O = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.lora_alpha)
+                self.lora_O = AUTOAdapterLayer(num_experts=args.num_experts, moe_type=args.moe_type, top_k=args.top_k, expert_type='lora', noisy_router=args.noisy_router,\
+                                                lb_loss=args.lb_loss, asym=args.asym, input_dim=args.dim, output_dim=args.dim, lora_r=args.lora_rank, lora_alpha=args.lora_alpha)
             
-            # self.expert_weight = args.expert_weight
-            # if self.expert_weight:
-            #     type_param_num = []
-            #     if 'Q' in self.lora_targets:
-            #         type_param_num.append(self.lora_Q.params_count())
-            #     if 'K' in self.lora_targets:
-            #         type_param_num.append(self.lora_K.params_count())
-            #     if 'V' in self.lora_targets:
-            #         type_param_num.append(self.lora_V.params_count())
-            #     if 'O' in self.lora_targets:
-            #         type_param_num.append(self.lora_O.params_count())
-            #     # weight according to param number
-            #     with torch.no_grad():
-            #         type_weight_param = torch.FloatTensor(type_param_num)
-            #         self.type_weight_param = self.lora_type * nn.functional.softmax(type_weight_param, dim=-1, dtype=torch.float32)
-        
         self.w_prompt = w_prompt
         if self.w_prompt:
             self.prompt = nn.Embedding(args.prompt_len, args.dim)
             self.prompt_gate = torch.nn.Parameter(torch.zeros(1, self.n_local_heads, 1, 1))
+            if self.args.num_experts >1:
+                self.prompt_router = nn.Linear(args.dim, self.args.num_experts)
                 
         self.cache_k = None
         self.cache_v = None
@@ -336,28 +326,51 @@ class Attention(nn.Module):
                 xq = xq.transpose(1, 2)
 
             # sparse computing can not work for prompt-tuning, using non-sparse way
-
             type_weight_prompt = type_weight[:,:,type_idx] 
 
-            prompt = self.prompt.weight
-            prompt_k = self.wk(prompt).view(1, self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
-            prompt_v = self.wv(prompt).view(1, self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
+            if self.args.num_experts == 1:
+                prompt = self.prompt.weight
+                prompt_k = self.wk(prompt).view(1, self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
+                prompt_v = self.wv(prompt).view(1, self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
 
-            prompt_k = repeat_kv(prompt_k, self.n_rep) # [bs, prompt_len, n_local_heads, head_dim]
-            prompt_v = repeat_kv(prompt_v, self.n_rep)
+                prompt_k = repeat_kv(prompt_k, self.n_rep) # [bs, prompt_len, n_local_heads, head_dim]
+                prompt_v = repeat_kv(prompt_v, self.n_rep)
 
-            prompt_k = prompt_k.transpose(1, 2)
-            prompt_v = prompt_v.transpose(1, 2) # [bs, n_local_heads, prompt_len, head_dim]
+                prompt_k = prompt_k.transpose(1, 2)
+                prompt_v = prompt_v.transpose(1, 2) # [bs, n_local_heads, prompt_len, head_dim]
 
-            prompt_scores = torch.matmul(xq, prompt_k.transpose(2, 3)) / math.sqrt(self.head_dim) # [bs, n_local_heads, seqlen, prompt_len]
+                prompt_scores = torch.matmul(xq, prompt_k.transpose(2, 3)) / math.sqrt(self.head_dim) # [bs, n_local_heads, seqlen, prompt_len]
+                
+                prompt_scores = self.prompt_gate * F.softmax(prompt_scores.float(), dim=-1).type_as(xq)
+                
+                prompt_output = torch.matmul(prompt_scores, prompt_v) # [bsz, local_heads, seqlen, head_dim]
+                prompt_output = prompt_output.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
+                
+            elif self.args.num_experts >1:
+                prompt = self.prompt.weight.reshape(self.args.num_experts, self.args.prompt_len, self.args.dim)
+                prompt_k = self.wk(prompt).view(1, self.args.num_experts * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
+                prompt_v = self.wv(prompt).view(1, self.args.num_experts * self.args.prompt_len, self.n_local_kv_heads, self.head_dim).repeat(bsz, 1, 1, 1)
+
+                prompt_k = repeat_kv(prompt_k, self.n_rep) # [bs, expert_num * prompt_len, n_local_heads, head_dim]
+                prompt_v = repeat_kv(prompt_v, self.n_rep)
+
+                prompt_k = prompt_k.transpose(1, 2)
+                prompt_v = prompt_v.transpose(1, 2) # [bs, n_local_heads, expert_num * prompt_len, head_dim]
+
+                prompt_scores = torch.matmul(xq, prompt_k.transpose(2, 3)) / math.sqrt(self.head_dim) # [bs, n_local_heads, seqlen, expert_num * prompt_len]
+                
+                prompt_scores = self.prompt_gate * F.softmax(prompt_scores.float(), dim=-1).type_as(xq)
+
+                prompt_scores = prompt_scores.view(bsz, self.n_local_heads, -1, self.args.num_experts, self.args.prompt_len).transpose(2,3)
+                prompt_v = prompt_v.view(bsz, self.n_local_heads, self.args.num_experts, self.args.prompt_len, self.head_dim)
+                
+                prompt_output = torch.matmul(prompt_scores, prompt_v) # [bsz, local_heads, expertnum, seqlen, head_dim]
+                prompt_output = prompt_output.permute(0,3,2,1,4).contiguous().view(bsz,seqlen,self.args.num_experts, -1)
+                prompt_weight = nn.functional.softmax(self.prompt_router(x), dim=-1, dtype=torch.float32).to(x.dtype)
+                prompt_output = torch.sum(prompt_weight.unsqueeze(-1) * prompt_output, 2, keepdim=True)
+                prompt_output = prompt_output.squeeze(2)
             
-            prompt_scores = self.prompt_gate * F.softmax(prompt_scores.float(), dim=-1).type_as(xq)
-            
-            prompt_output = torch.matmul(prompt_scores, prompt_v) # [bsz, local_heads, seqlen, head_dim]
-            prompt_output = prompt_output.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
-
             prompt_output = prompt_output * type_weight_prompt.unsqueeze(-1)
-            
             output = output + prompt_output
 
             type_idx += 1
@@ -402,10 +415,12 @@ class FeedForward(nn.Module):
         if self.w_lora:
             self.lora_targets = args.lora_targets.split(',')
             if 'FFN_UP' in self.lora_targets:
-                self.lora_UP = MOELoraLayer(args.dim, hidden_dim, args.lora_rank, args.lora_alpha)
+                self.lora_UP = AUTOAdapterLayer(num_experts=args.num_experts, moe_type=args.moe_type, top_k=args.top_k, expert_type='lora', noisy_router=args.noisy_router, \
+                                                lb_loss=args.lb_loss, asym=args.asym, input_dim=args.dim, output_dim=hidden_dim, lora_r=args.lora_rank, lora_alpha=args.lora_alpha)
 
             if 'FFN_DOWN' in self.lora_targets:
-                self.lora_DOWN = MOELoraLayer(hidden_dim, args.dim, args.lora_rank, args.lora_alpha)
+                self.lora_DOWN = AUTOAdapterLayer(num_experts=args.num_experts, moe_type=args.moe_type, top_k=args.top_k, expert_type='lora', noisy_router=args.noisy_router, \
+                                                lb_loss=args.lb_loss, asym=args.asym, input_dim=hidden_dim, output_dim=args.dim, lora_r=args.lora_rank, lora_alpha=args.lora_alpha)
 
     def forward(self, x, type_weight:Optional[torch.Tensor]):
         if self.w_lora:
@@ -443,8 +458,9 @@ class TransformerBlock(nn.Module):
 
         self.w_padapter = w_padapter
         if self.w_padapter:
-            self.p_adapter = PAdapterLayer(self.dim, args.p_adapter_size)
-        
+            self.p_adapter = AUTOAdapterLayer(num_experts=args.num_experts, moe_type=args.moe_type, top_k=args.top_k, expert_type='padapter', noisy_router=args.noisy_router, \
+                                                lb_loss=args.lb_loss, asym=args.asym, input_dim=self.dim, adapter_size=args.p_adapter_size)
+
         self.adapter_type = 0
         self.attention_type = 0
         self.FFN_type = 0

@@ -5,7 +5,7 @@ num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=1
+max_devices=2
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -38,32 +38,32 @@ eff_batch_size=32
 path="/home2/caojie"
 output_dir="${path}/outputs/LLaMA3-1_smoe/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_noisy_router${noisy_router}_adamole${adamole}_lb_loss_coeff${lb_loss_coeff}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
-torchrun --nproc_per_node $num_devices --master_port=3031 main_finetune.py \
-    --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
-    --data_path ${path}/datasets/${dataset}/train.json \
-    --expert_num $expert_num \
-    --noisy_router $noisy_router \
-    --adamole $adamole \
-    --lb_loss_coeff $lb_loss_coeff \
-    --lora_layers $lora_layers \
-    --lora_rank ${lora_rank} \
-    --lora_targets $lora_targets \
-    --lora_alpha $lora_alpha \
-    --max_seq_len $max_seq_len \
-    --batch_size  $batch_size_gpu \
-    --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \
-    --epochs ${epochs} \
-    --warmup_epochs 1 \
-    --blr ${blr} \
-    --flash_attention2 $flash_attention2 \
-    --bf16 $bf16 \
-    --weight_decay 0.02 \
-    --output_dir $output_dir \
-    --num_workers 10
+# torchrun --nproc_per_node $num_devices --master_port=3031 main_finetune.py \
+#     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
+#     --data_path ${path}/datasets/${dataset}/train.json \
+#     --expert_num $expert_num \
+#     --noisy_router $noisy_router \
+#     --adamole $adamole \
+#     --lb_loss_coeff $lb_loss_coeff \
+#     --lora_layers $lora_layers \
+#     --lora_rank ${lora_rank} \
+#     --lora_targets $lora_targets \
+#     --lora_alpha $lora_alpha \
+#     --max_seq_len $max_seq_len \
+#     --batch_size  $batch_size_gpu \
+#     --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \
+#     --epochs ${epochs} \
+#     --warmup_epochs 1 \
+#     --blr ${blr} \
+#     --flash_attention2 $flash_attention2 \
+#     --bf16 $bf16 \
+#     --weight_decay 0.02 \
+#     --output_dir $output_dir \
+#     --num_workers 10
 
 checkpoint="${output_dir}checkpoint-$((epochs-1)).pth"
 # get lora parameters
-python extract_adapter_from_checkpoint.py --checkpoint $checkpoint
+# python extract_adapter_from_checkpoint.py --checkpoint $checkpoint
 
 adapter_path="${output_dir}adapter.pth"
 

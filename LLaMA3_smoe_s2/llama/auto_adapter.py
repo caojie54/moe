@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Optional, Tuple, List
-from sparse_moe import LoraLayer, PAdapterLayer, TopkMoE, AdaMoLE
+from .sparse_moe import LoraLayer, PAdapterLayer, TopkMoE, AdaMoLE
 
 class AUTOAdapterLayer(nn.Module):
     def __init__(self, num_experts=2, moe_type='topk', top_k=2, expert_type='lora', noisy_router=False, lb_loss=False, asym=False, input_dim=None, output_dim=None, lora_r=None, lora_alpha=None, adapter_size=None):

@@ -36,15 +36,25 @@ def main(
     adapter_params['lora_rank'] = args.lora_rank
     adapter_params['lora_targets'] = args.lora_targets
     adapter_params['lora_alpha'] = args.lora_alpha
+    
+    adapter_params['p_adapter_layers'] = args.p_adapter_layers
+    adapter_params['p_adapter_size'] = args.p_adapter_size
+    
+    adapter_params['prompt_layers'] = args.prompt_layers
+    adapter_params['prompt_len'] = args.prompt_len
+
     adapter_params['max_threshold'] = args.max_threshold
     adapter_params['bool_weights'] = args.bool_weights
     adapter_params['swi_x'] = args.swi_x
-    adapter_params['p_adapter_layers'] = args.p_adapter_layers
-    adapter_params['p_adapter_size'] = args.p_adapter_size
-    adapter_params['p_adapter_hydra'] = args.p_adapter_hydra
-    adapter_params['prompt_layers'] = args.prompt_layers
-    adapter_params['prompt_len'] = args.prompt_len
-    adapter_params['expert_weight'] = args.expert_weight
+
+    adapter_params['num_experts'] = args.num_experts
+    adapter_params['moe_type'] = args.moe_type
+    adapter_params['top_k'] = args.top_k
+    adapter_params['noisy_router'] = args.noisy_router
+    adapter_params['lb_loss'] = args.lb_loss
+    adapter_params['lb_loss_coeff'] = args.lb_loss_coeff
+    adapter_params['asym'] = args.asym
+
     adapter_params['max_seq_len'] = args.max_seq_len
     adapter_params['flash_attention2'] = args.flash_attention2
     adapter_params['bf16'] = args.bf16
