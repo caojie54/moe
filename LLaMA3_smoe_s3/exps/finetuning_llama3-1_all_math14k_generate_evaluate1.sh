@@ -1,11 +1,11 @@
-# export CUDA_VISIBLE_DEVICES="0"
+# export CUDA_VISIBLE_DEVICES="0,1"
 
 # Count the number of devices
 num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=2
+max_devices=1
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -13,14 +13,14 @@ if [ "$num_devices" -gt "$max_devices" ]; then
 fi
 
 # train
-epochs=2
-warmup_epochs=1
+epochs=1
+warmup_epochs=0.4
 dataset="math_14k"
 max_seq_len=300
 min_gen_len=120
 max_gen_len=200
 
-bool_weights=False
+bool_weights=True
 max_threshold=0.5
 
 swi_x=4
@@ -41,19 +41,19 @@ lora_alpha=8
 p_adapter_layers="0-32"
 p_adapter_size=16
 
-prompt_layers="0-32"
+prompt_layers="0-0"
 prompt_len=10
 
 blr=6e-3
 flash_attention2=False
 bf16=True
 tag="sigmoid"
-batch_size_gpu=1
+batch_size_gpu=2
 eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_smoe_s2/${dataset}/b${eff_batch_size}_e${epochs}_we${warmup_epochs}_maxthre${max_threshold}_boolw${bool_weights}_swi_x${swi_x}_num_e${num_experts}_moe_type${moe_type}_top_k${top_k}_noisy${noisy_router}_lb${lb_loss}_lb_co${lb_loss_coeff}_asym${asym}_loral${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_palayers${p_adapter_layers}_pasize${p_adapter_size}_promptl${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}/"
+output_dir="${path}/outputs/LLaMA3-1_smoe_s3/${dataset}/b${eff_batch_size}_e${epochs}_we${warmup_epochs}_maxthre${max_threshold}_boolw${bool_weights}_swi_x${swi_x}_num_e${num_experts}_moe_type${moe_type}_top_k${top_k}_noisy${noisy_router}_lb${lb_loss}_lb_co${lb_loss_coeff}_asym${asym}_loral${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_palayers${p_adapter_layers}_pasize${p_adapter_size}_promptl${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}/"
 
-torchrun --nproc_per_node $num_devices --master_port=3032 main_finetune.py \
+torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --data_path ${path}/datasets/${dataset}/train.json \
     --max_threshold $max_threshold \
@@ -98,7 +98,7 @@ test_dataset_l="AddSub AQuA gsm8k MultiArith SingleEq SVAMP"
 for test_dataset in $test_dataset_l
 do
 save_path="${output_dir}${test_dataset}_predict_mingen${min_gen_len}.jsonl"
-torchrun --nproc_per_node $num_devices --master_port=3032 example.py \
+torchrun --nproc_per_node $num_devices --master_port=3038 example.py \
     --ckpt_dir ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --adapter_path $adapter_path \
     --data_path ${path}/datasets/math_commonsense/${test_dataset}/test.json \

@@ -258,20 +258,20 @@ class Attention(nn.Module):
             ).cuda()
         return super().train(mode)
 
-    def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor], type_weight:Optional[torch.Tensor]):
+    def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor], type_weight:Optional[torch.Tensor], adapted_type_weights:Optional[torch.Tensor]):
         bsz, seqlen, _ = x.shape
         xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
 
         type_idx = 0
         if self.w_lora:
             if 'Q' in self.lora_targets:
-                xq = xq + self.lora_Q(x, type_weight[:,:,type_idx])
+                xq = xq + self.lora_Q(x, type_weight[:,:,type_idx], adapted_type_weights[:,:,type_idx])
                 type_idx += 1
             if 'K' in self.lora_targets:
-                xk = xk + self.lora_K(x, type_weight[:,:,type_idx])
+                xk = xk + self.lora_K(x, type_weight[:,:,type_idx], adapted_type_weights[:,:,type_idx])
                 type_idx += 1
             if 'V' in self.lora_targets:
-                xv = xv + self.lora_V(x, type_weight[:,:,type_idx])
+                xv = xv + self.lora_V(x, type_weight[:,:,type_idx], adapted_type_weights[:,:,type_idx])
                 type_idx += 1
 
         xq = xq.view(bsz, seqlen, self.n_local_heads, self.head_dim)
@@ -376,7 +376,7 @@ class Attention(nn.Module):
             type_idx += 1
 
         if self.w_lora and 'O' in self.lora_targets:
-            return self.wo(output) + self.lora_O(output, type_weight[:,:,type_idx])
+            return self.wo(output) + self.lora_O(output, type_weight[:,:,type_idx], adapted_type_weights[:,:,type_idx])
         else:
             return self.wo(output)
 
@@ -422,17 +422,17 @@ class FeedForward(nn.Module):
                 self.lora_DOWN = AUTOAdapterLayer(num_experts=args.num_experts, moe_type=args.moe_type, top_k=args.top_k, expert_type='lora', noisy_router=args.noisy_router, \
                                                 lb_loss=args.lb_loss, asym=args.asym, input_dim=hidden_dim, output_dim=args.dim, lora_r=args.lora_rank, lora_alpha=args.lora_alpha)
 
-    def forward(self, x, type_weight:Optional[torch.Tensor]):
+    def forward(self, x, type_weight:Optional[torch.Tensor], adapted_type_weights:Optional[torch.Tensor]):
         if self.w_lora:
             type_idx = 0
             if 'FFN_UP' in self.lora_targets:
-                out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx]))
+                out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx], adapted_type_weights[:,:,type_idx]))
                 type_idx += 1
             else:
                 out = F.silu(self.w1(x)) * self.w3(x)
             
             if 'FFN_DOWN' in self.lora_targets:
-                out = self.w2(out) + self.lora_DOWN(out, type_weight[:,:,type_idx])
+                out = self.w2(out) + self.lora_DOWN(out, type_weight[:,:,type_idx], adapted_type_weights[:,:,type_idx])
             else:
                 out = self.w2(out)
             return out
@@ -503,16 +503,18 @@ class TransformerBlock(nn.Module):
         else:
             type_weights = type_weights * selected_experts 
 
+        adapted_type_weights = selected_experts * adapted_type_weights
+
         type_idx = 0
-        h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask, type_weight=type_weights[:,:,type_idx:type_idx+self.attention_type])
+        h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask, type_weight=type_weights[:,:,type_idx:type_idx+self.attention_type], adapted_type_weights=adapted_type_weights[:,:,type_idx:type_idx+self.attention_type])
         # out = h + self.feed_forward.forward(self.ffn_norm(h))
         type_idx += self.attention_type
         residual = h
         h = self.ffn_norm(h)
-        out = self.feed_forward.forward(h, type_weight=type_weights[:,:,type_idx:type_idx+self.FFN_type])
+        out = self.feed_forward.forward(h, type_weight=type_weights[:,:,type_idx:type_idx+self.FFN_type], adapted_type_weights=adapted_type_weights[:,:,type_idx:type_idx+self.attention_type])
         type_idx += self.FFN_type
         if self.w_padapter:
-            adapter_states = self.p_adapter(h, type_weight=type_weights[:,:,type_idx])
+            adapter_states = self.p_adapter(h, type_weight=type_weights[:,:,type_idx], adapted_type_weights=adapted_type_weights[:,:,type_idx])
             out = out + adapter_states
         out = residual + out
 
