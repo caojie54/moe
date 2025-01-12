@@ -20,8 +20,8 @@ max_seq_len=300
 min_gen_len=120
 max_gen_len=200
 
-bool_weights=True
-max_threshold=0.5
+bool_weights=False
+max_threshold=1
 
 swi_x=4
 

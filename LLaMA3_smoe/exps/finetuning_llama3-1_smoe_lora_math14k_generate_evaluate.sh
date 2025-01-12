@@ -5,7 +5,7 @@ num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=2
+max_devices=1
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -13,7 +13,8 @@ if [ "$num_devices" -gt "$max_devices" ]; then
 fi
 
 # train
-epochs=2
+epochs=1
+warmup_epochs=0.4
 dataset="math_14k"
 max_seq_len=300
 min_gen_len=120
@@ -27,7 +28,7 @@ lora_alpha=8
 expert_num=8
 top_k=2
 noisy_router=False
-lb_loss_coeff=0.001
+lb_loss_coeff=0
 
 blr=6e-3
 flash_attention2=False
@@ -36,7 +37,7 @@ tag=""
 batch_size_gpu=4
 eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_smoe/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_top_k${top_k}_noisy_router${noisy_router}_lb_loss_coeff${lb_loss_coeff}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_smoe/${dataset}/b${eff_batch_size}_epoch${epochs}_warme${warmup_epochs}_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_top_k${top_k}_noisy_router${noisy_router}_lb_loss_coeff${lb_loss_coeff}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3031 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
@@ -53,7 +54,7 @@ torchrun --nproc_per_node $num_devices --master_port=3031 main_finetune.py \
     --batch_size  $batch_size_gpu \
     --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \
     --epochs ${epochs} \
-    --warmup_epochs 1 \
+    --warmup_epochs $warmup_epochs \
     --blr ${blr} \
     --flash_attention2 $flash_attention2 \
     --bf16 $bf16 \

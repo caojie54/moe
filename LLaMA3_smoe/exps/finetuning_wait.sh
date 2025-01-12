@@ -31,11 +31,11 @@ while true; do
         # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_adamole_lora_commonsense15k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate1.sh
-        bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate2.sh
+        # bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate2.sh
         # bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate1.sh
         # bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate2.sh
         # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate1.sh
@@ -59,5 +59,5 @@ while true; do
     fi
 
     # Wait for 5 seconds before the next check
-    sleep 6
+    sleep 3600
 done

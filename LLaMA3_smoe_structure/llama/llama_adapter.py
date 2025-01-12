@@ -38,6 +38,7 @@ class LLaMA_adapter(nn.Module):
             lora_alpha = args.lora_alpha,
             max_threshold = args.max_threshold,
             bool_weights = args.bool_weights,
+            adapter_noisy = args.adapter_noisy,
             swi_x= args.swi_x,
             p_adapter_layers = args.p_adapter_layers,
             p_adapter_size = args.p_adapter_size,

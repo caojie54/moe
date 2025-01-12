@@ -59,6 +59,7 @@ class ModelArgs:
     # sparse structure moe
     max_threshold: float = 0.5
     bool_weights: bool= False
+    adapter_noisy: bool = False
 
     swi_x: int = 0 # 0 is normal Linear, 
     
@@ -292,22 +293,6 @@ class Attention(nn.Module):
             if 'O' in self.lora_targets:
                 self.lora_O = MOELoraLayer(args.dim, args.dim, args.lora_rank, args.lora_alpha)
             
-            # self.expert_weight = args.expert_weight
-            # if self.expert_weight:
-            #     type_param_num = []
-            #     if 'Q' in self.lora_targets:
-            #         type_param_num.append(self.lora_Q.params_count())
-            #     if 'K' in self.lora_targets:
-            #         type_param_num.append(self.lora_K.params_count())
-            #     if 'V' in self.lora_targets:
-            #         type_param_num.append(self.lora_V.params_count())
-            #     if 'O' in self.lora_targets:
-            #         type_param_num.append(self.lora_O.params_count())
-            #     # weight according to param number
-            #     with torch.no_grad():
-            #         type_weight_param = torch.FloatTensor(type_param_num)
-            #         self.type_weight_param = self.lora_type * nn.functional.softmax(type_weight_param, dim=-1, dtype=torch.float32)
-        
         self.w_prompt = w_prompt
         if self.w_prompt:
             self.prompt = nn.Embedding(args.prompt_len, args.dim)
@@ -530,6 +515,10 @@ class TransformerBlock(nn.Module):
         elif args.swi_x > 0:
             self.adapter_type_router = Router(args.dim, self.adapter_type * args.swi_x, self.adapter_type)
         
+        self.noisy = args.adapter_noisy
+        if self.noisy:
+            self.noise_linear =nn.Linear(args.dim, self.adapter_type)
+
         self.threshold_fn = nn.Linear(args.dim, 1)
         self.max_threshold = args.max_threshold
         self.bool_weights = args.bool_weights
@@ -539,6 +528,13 @@ class TransformerBlock(nn.Module):
 
         # type_weights = self.adapter_type * nn.functional.softmax(self.adapter_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, adapter_type]
         type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        if self.noisy:
+            #Noise logits
+            noise_logits = self.noise_linear(x)
+            #Adding scaled unit gaussian noise to the logits
+            noise = torch.randn_like(type_weights)*F.softplus(noise_logits)
+            type_weights = type_weights + noise
+
         thresholds = F.sigmoid(self.threshold_fn(x)) * self.max_threshold # [bsz, seqlen, 1]
         adapted_type_weights = type_weights - thresholds
         selected_experts = torch.ge(adapted_type_weights, 0).to(torch.float)

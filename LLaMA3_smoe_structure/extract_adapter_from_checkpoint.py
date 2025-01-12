@@ -38,6 +38,7 @@ def main(
     adapter_params['lora_alpha'] = args.lora_alpha
     adapter_params['max_threshold'] = args.max_threshold
     adapter_params['bool_weights'] = args.bool_weights
+    adapter_params['adapter_noisy'] = args.adapter_noisy
     adapter_params['swi_x'] = args.swi_x
     adapter_params['p_adapter_layers'] = args.p_adapter_layers
     adapter_params['p_adapter_size'] = args.p_adapter_size

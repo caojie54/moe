@@ -28,8 +28,8 @@ while true; do
         # bash ./exps/finetuning_llama3-1_math14k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_commonsense15k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate2.sh
-        # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate1.sh
         bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate1.sh
         # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate3.sh
         # bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate1.sh
@@ -47,5 +47,5 @@ while true; do
     fi
 
     # Wait for 5 seconds before the next check
-    sleep 20 
+    sleep  3600
 done
