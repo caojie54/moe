@@ -5,7 +5,7 @@ num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=1
+max_devices=2
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -21,7 +21,7 @@ min_gen_len=120
 max_gen_len=200
 
 bool_weights=False
-max_threshold=1
+max_threshold=0.8
 
 swi_x=4
 
@@ -31,7 +31,7 @@ top_k=2 # top_k experts in topk moe
 noisy_router=False # moe router
 lb_loss=False # moe load balancing loss
 lb_loss_coeff=0 # moe load balancing loss coefficient
-asym=False #  Asymmetric structure for LoRA and Parallel adapter
+asym=True #  Asymmetric structure for LoRA and Parallel adapter
 
 lora_layers="0-32"
 lora_rank=8

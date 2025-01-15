@@ -5,7 +5,7 @@ num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=1
+max_devices=2
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -13,7 +13,7 @@ if [ "$num_devices" -gt "$max_devices" ]; then
 fi
 
 # train
-epochs=3
+epochs=2
 dataset="commonsense_15k"
 max_seq_len=200
 min_gen_len=10
@@ -31,15 +31,15 @@ p_adapter_layers="0-32"
 p_adapter_size=16
 p_adapter_hydra=True
 
-prompt_layers="0-32"
+prompt_layers="0-0"
 prompt_len=10
 
-swi_x=4
+swi_x=0
 
 blr=6e-3
 flash_attention2=False
 bf16=True
-tag="sigmoid"
+tag=""
 batch_size_gpu=8
 eff_batch_size=32
 path="/home2/caojie"

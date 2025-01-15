@@ -5,7 +5,7 @@ num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=1
+max_devices=2
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -13,8 +13,8 @@ if [ "$num_devices" -gt "$max_devices" ]; then
 fi
 
 # train
-epochs=2
-warmup_epochs=1
+epochs=1
+warmup_epochs=0.4
 dataset="math_14k"
 max_seq_len=300
 min_gen_len=120
@@ -41,14 +41,14 @@ lora_alpha=8
 p_adapter_layers="0-32"
 p_adapter_size=16
 
-prompt_layers="0-0"
+prompt_layers="0-32"
 prompt_len=10
 
 blr=6e-3
 flash_attention2=False
 bf16=True
 tag="sigmoid"
-batch_size_gpu=2
+batch_size_gpu=1
 eff_batch_size=32
 path="/home2/caojie"
 output_dir="${path}/outputs/LLaMA3-1_smoe_s3/${dataset}/b${eff_batch_size}_e${epochs}_we${warmup_epochs}_maxthre${max_threshold}_boolw${bool_weights}_swi_x${swi_x}_num_e${num_experts}_moe_type${moe_type}_top_k${top_k}_noisy${noisy_router}_lb${lb_loss}_lb_co${lb_loss_coeff}_asym${asym}_loral${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_palayers${p_adapter_layers}_pasize${p_adapter_size}_promptl${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}/"

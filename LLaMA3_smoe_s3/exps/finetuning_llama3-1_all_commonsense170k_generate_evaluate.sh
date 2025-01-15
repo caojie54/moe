@@ -13,54 +13,73 @@ if [ "$num_devices" -gt "$max_devices" ]; then
 fi
 
 # train
-epochs=2
+epochs=3
+warmup_epochs=1
+
 dataset="commonsense_170k"
 max_seq_len=200
 min_gen_len=10
 max_gen_len=40
 
+bool_weights=False
+max_threshold=0.8
+
+swi_x=0
+
+num_experts=8 # moe when num_experts > 1
+moe_type='adamole' # adamole, topk
+top_k=2 # top_k experts in topk moe
+noisy_router=False # moe router
+lb_loss=False # moe load balancing loss
+lb_loss_coeff=0 # moe load balancing loss coefficient
+asym=False #  Asymmetric structure for LoRA and Parallel adapter
+
 lora_layers="0-32"
 lora_rank=8
 lora_targets="Q,K,V,O,FFN_DOWN"
-lora_alpha=8
-hydra_moe=True # hydra lora, Asymmetric LoRA
-expert_num=1
+lora_alpha=32
 
 p_adapter_layers="0-32"
 p_adapter_size=16
-p_adapter_hydra=True
 
-prompt_layers="0-32"
+prompt_layers="0-0"
 prompt_len=10
 
 blr=1e-3
 flash_attention2=False
 bf16=True
 tag="sigmoid"
-batch_size_gpu=8
+batch_size_gpu=4
 eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_lora_moe_structure/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_padapterhydra${p_adapter_hydra}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_smoe_s3/${dataset}/b${eff_batch_size}_e${epochs}_we${warmup_epochs}_maxthre${max_threshold}_boolw${bool_weights}_swi_x${swi_x}_num_e${num_experts}_moe_type${moe_type}_top_k${top_k}_noisy${noisy_router}_lb${lb_loss}_lb_co${lb_loss_coeff}_asym${asym}_loral${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_palayers${p_adapter_layers}_pasize${p_adapter_size}_promptl${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --data_path ${path}/datasets/${dataset}/train.json \
-    --expert_num $expert_num \
+    --max_threshold $max_threshold \
+    --bool_weights $bool_weights \
+    --swi_x $swi_x \
+    --num_experts $num_experts \
+    --moe_type $moe_type \
+    --top_k $top_k \
+    --noisy_router $noisy_router \
+    --lb_loss $lb_loss \
+    --lb_loss_coeff $lb_loss_coeff \
+    --asym $asym \
     --lora_layers $lora_layers \
     --lora_rank ${lora_rank} \
     --lora_targets $lora_targets \
     --lora_alpha $lora_alpha \
-    --hydra_moe $hydra_moe \
     --p_adapter_layers $p_adapter_layers \
     --p_adapter_size $p_adapter_size \
-    --p_adapter_hydra $p_adapter_hydra \
     --prompt_layers $prompt_layers\
     --prompt_len $prompt_len \
     --max_seq_len $max_seq_len \
     --batch_size  $batch_size_gpu \
     --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \
     --epochs ${epochs} \
-    --warmup_epochs 1 \
+    --warmup_epochs $warmup_epochs \
     --blr ${blr} \
     --flash_attention2 $flash_attention2 \
     --bf16 $bf16 \
@@ -82,7 +101,7 @@ max_seq_len=600
 for test_dataset in $test_dataset_l
 do
 save_path="${output_dir}${test_dataset}_predict_mingen${min_gen_len}.jsonl"
-torchrun --nproc_per_node $num_devices --master_port=3038 example.py \
+torchrun --nproc_per_node $num_devices --master_port=3039 example.py \
     --ckpt_dir ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --adapter_path $adapter_path \
     --data_path ${path}/datasets/math_commonsense/${test_dataset}/test.json \
