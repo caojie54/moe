@@ -517,9 +517,9 @@ class TransformerBlock(nn.Module):
         
         self.noisy = args.adapter_noisy
         if self.noisy:
-            self.noise_linear =nn.Linear(args.dim, self.adapter_type)
+            self.adapter_noise_linear = nn.Linear(args.dim, self.adapter_type)
 
-        self.threshold_fn = nn.Linear(args.dim, 1)
+        self.adapter_threshold_fn = nn.Linear(args.dim, 1)
         self.max_threshold = args.max_threshold
         self.bool_weights = args.bool_weights
 
@@ -530,12 +530,12 @@ class TransformerBlock(nn.Module):
         type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
         if self.noisy:
             #Noise logits
-            noise_logits = self.noise_linear(x)
+            noise_logits = self.adapter_noise_linear(x)
             #Adding scaled unit gaussian noise to the logits
             noise = torch.randn_like(type_weights)*F.softplus(noise_logits)
             type_weights = type_weights + noise
 
-        thresholds = F.sigmoid(self.threshold_fn(x)) * self.max_threshold # [bsz, seqlen, 1]
+        thresholds = F.sigmoid(self.adapter_threshold_fn(x)) * self.max_threshold # [bsz, seqlen, 1]
         adapted_type_weights = type_weights - thresholds
         selected_experts = torch.ge(adapted_type_weights, 0).to(torch.float)
 

@@ -1,11 +1,11 @@
-# export CUDA_VISIBLE_DEVICES="0,1"
+export CUDA_VISIBLE_DEVICES="0"
 
 # Count the number of devices
 num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=2
+max_devices=1
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices

@@ -5,7 +5,7 @@ num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=1
+max_devices=2
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -39,7 +39,7 @@ swi_x=4
 blr=6e-3
 flash_attention2=False
 bf16=True
-tag="sigmoid"
+tag="fixTh"
 batch_size_gpu=8
 eff_batch_size=32
 path="/home2/caojie"

@@ -1,4 +1,4 @@
-# export CUDA_VISIBLE_DEVICES="0,1"
+# export CUDA_VISIBLE_DEVICES="0"
 
 # Count the number of devices
 num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
@@ -21,17 +21,17 @@ min_gen_len=120
 max_gen_len=200
 
 lora_layers="0-32"
-lora_rank=8
+lora_rank=4
 lora_targets="Q,K,V,O,FFN_DOWN"
 lora_alpha=8
 bool_weights=False
 max_threshold=0.5
-adapter_noisy=True
+adapter_noisy=False
 
 p_adapter_layers="0-32"
 p_adapter_size=16
 
-prompt_layers="0-32"
+prompt_layers="0-0"
 prompt_len=10
 
 swi_x=4
@@ -39,7 +39,7 @@ swi_x=4
 blr=6e-3
 flash_attention2=False
 bf16=True
-tag="sigmoid"
+tag="fixTh_2gpu"
 batch_size_gpu=8
 eff_batch_size=32
 path="/home2/caojie"

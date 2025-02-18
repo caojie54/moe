@@ -2,7 +2,8 @@
 # export TIKTOKEN_CACHE_DIR="/mnt/caojie/caojie/cache"
 # Loop indefinitely
 # gpu memory need
-memory=45
+# memory=45
+memory=34
 while true; do
     echo "Checking at $(date)"  # Print the current time
     
@@ -27,9 +28,10 @@ while true; do
         echo "Running command on GPUs: $CUDA_VISIBLE_DEVICES"
         # bash ./exps/finetuning_llama3-1_commonsense170k_generate_evaluate.sh
         bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate1.sh
         # bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate1.sh
         # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate.sh
-        bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate.sh
+        # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate1.sh
         # bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_prompt_math14k_generate_evaluate.sh
