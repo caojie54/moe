@@ -5,7 +5,7 @@ num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=1
+max_devices=2
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -39,11 +39,11 @@ swi_x=4
 blr=6e-3
 flash_attention2=False
 bf16=True
-tag="fix1GIter1"
+tag="fixIter2"
 batch_size_gpu=8
-eff_batch_size=32
+# eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_smoe_structure/${dataset}/b${eff_batch_size}_epoch${epochs}_warme${warmup_epochs}_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_max_thre${max_threshold}_boolweights${bool_weights}_adanoisy${adapter_noisy}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_promptlayers${prompt_layers}_prompt_len${prompt_len}_swi_x${swi_x}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_smoe_structure/${dataset}/b${batch_size_gpu}_gpu${num_devices}_epoch${epochs}_warme${warmup_epochs}_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_max_thre${max_threshold}_boolweights${bool_weights}_adanoisy${adapter_noisy}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_promptlayers${prompt_layers}_prompt_len${prompt_len}_swi_x${swi_x}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
@@ -62,7 +62,7 @@ torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --swi_x $swi_x \
     --max_seq_len $max_seq_len \
     --batch_size  $batch_size_gpu \
-    --accum_iter 1 \
+    --accum_iter 2 \
     --epochs ${epochs} \
     --warmup_epochs $warmup_epochs \
     --blr ${blr} \

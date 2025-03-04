@@ -21,15 +21,15 @@ min_gen_len=120
 max_gen_len=200
 
 lora_layers="0-32"
-lora_rank=32
-lora_targets="Q,K,V,O,FFN_DOWN"
-lora_alpha=32
+lora_rank=4
+lora_targets="Q,K,V,O,FFN_DOWN,FFN_UP"
+lora_alpha=8
 bool_weights=False
 max_threshold=0.5
 adapter_noisy=False
 
 p_adapter_layers="0-32"
-p_adapter_size=32
+p_adapter_size=200
 
 prompt_layers="0-0"
 prompt_len=10
@@ -43,7 +43,7 @@ tag="fixTh_eff8"
 batch_size_gpu=8
 eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_smoe_structure/${dataset}/b${eff_batch_size}_epoch${epochs}_warme${warmup_epochs}_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_max_threshold${max_threshold}_bool_weights${bool_weights}_adapter_noisy${adapter_noisy}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_swi_x${swi_x}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_smoe_structure/${dataset}/b${eff_batch_size}_gpu${num_devices}_epoch${epochs}_warme${warmup_epochs}_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_max_threshold${max_threshold}_bool_weights${bool_weights}_adapter_noisy${adapter_noisy}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_swi_x${swi_x}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \

@@ -31,7 +31,7 @@ p_adapter_layers="0-32"
 p_adapter_size=16
 p_adapter_hydra=True
 
-prompt_layers="0-32"
+prompt_layers="0-0"
 prompt_len=10
 
 swi_x=4
