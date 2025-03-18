@@ -53,7 +53,7 @@ def get_args_parser():
     parser.add_argument('--max_threshold', default=0.5, type=float, help='max_threshold for selecting experts')
     parser.add_argument('--bool_weights', type=str2bool, nargs='?', const=True, default=False, help='bool_weights for structure weight')
     parser.add_argument('--adapter_noisy', type=str2bool, nargs='?', const=True, default=False, help='noisy adapter router ')
-    parser.add_argument('--expert_weight', type=str2bool, nargs='?', const=True, default=False, help='type weight for expert by expert params count ')
+    parser.add_argument('--const_threshold', type=str2bool, nargs='?', const=True, default=False, help='constant value as threshold')
 
     # prompt
     parser.add_argument('--prompt_layers', default='0-0', type=str, help="")

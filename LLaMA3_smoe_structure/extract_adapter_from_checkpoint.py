@@ -39,13 +39,13 @@ def main(
     adapter_params['max_threshold'] = args.max_threshold
     adapter_params['bool_weights'] = args.bool_weights
     adapter_params['adapter_noisy'] = args.adapter_noisy
+    adapter_params['const_threshold'] = args.const_threshold
     adapter_params['swi_x'] = args.swi_x
     adapter_params['p_adapter_layers'] = args.p_adapter_layers
     adapter_params['p_adapter_size'] = args.p_adapter_size
     adapter_params['p_adapter_hydra'] = args.p_adapter_hydra
     adapter_params['prompt_layers'] = args.prompt_layers
     adapter_params['prompt_len'] = args.prompt_len
-    adapter_params['expert_weight'] = args.expert_weight
     adapter_params['max_seq_len'] = args.max_seq_len
     adapter_params['flash_attention2'] = args.flash_attention2
     adapter_params['bf16'] = args.bf16

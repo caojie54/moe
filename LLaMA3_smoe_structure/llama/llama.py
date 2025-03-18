@@ -60,6 +60,7 @@ class ModelArgs:
     max_threshold: float = 0.5
     bool_weights: bool= False
     adapter_noisy: bool = False
+    const_threshold: bool = False
 
     swi_x: int = 0 # 0 is normal Linear, 
     
@@ -93,7 +94,7 @@ class MOELoraLayer(nn.Module):
         batch_idx = torch.where(type_weight)
 
         selected_x = x[batch_idx] # [m, dim] ,m tokens selected for this expert
-        selected_x = self.lora_B(self.lora_A(selected_x)) * self.scaling
+        selected_x = self.lora_B(self.lora_A(selected_x)) * self.scaling  # selected_x 为空是允许的
 
         if len(batch_idx[0])>0:
             results[batch_idx] += type_weight[batch_idx].unsqueeze(-1) * selected_x
@@ -519,7 +520,9 @@ class TransformerBlock(nn.Module):
         if self.noisy:
             self.adapter_noise_linear = nn.Linear(args.dim, self.adapter_type)
 
-        self.adapter_threshold_fn = nn.Linear(args.dim, 1)
+        self.const_threshold = args.const_threshold
+        if not self.const_threshold:
+            self.adapter_threshold_fn = nn.Linear(args.dim, 1)
         self.max_threshold = args.max_threshold
         self.bool_weights = args.bool_weights
 
@@ -534,15 +537,19 @@ class TransformerBlock(nn.Module):
             #Adding scaled unit gaussian noise to the logits
             noise = torch.randn_like(type_weights)*F.softplus(noise_logits)
             type_weights = type_weights + noise
-
-        thresholds = F.sigmoid(self.adapter_threshold_fn(x)) * self.max_threshold # [bsz, seqlen, 1]
+            
+        if self.const_threshold:
+            thresholds = self.max_threshold
+        else:
+            thresholds = F.sigmoid(self.adapter_threshold_fn(x)) * self.max_threshold # [bsz, seqlen, 1]
         adapted_type_weights = type_weights - thresholds
         selected_experts = torch.ge(adapted_type_weights, 0).to(torch.float)
 
         if self.bool_weights: # disard experts that weights less than threshold or use 0,1 by selected_experts
             type_weights = selected_experts
         else:
-            type_weights = type_weights * selected_experts 
+            # type_weights = type_weights * selected_experts # 尝试直接使用 adapted_type_weights
+            type_weights = adapted_type_weights * selected_experts # 尝试直接使用 adapted_type_weights
 
         type_idx = 0
         h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask, type_weight=type_weights[:,:,type_idx:type_idx+self.attention_type])

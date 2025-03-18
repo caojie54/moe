@@ -485,7 +485,7 @@ class TransformerBlock(nn.Module):
         elif args.swi_x > 0:
             self.adapter_type_router = Router(args.dim, self.adapter_type * args.swi_x, self.adapter_type)
         
-        self.threshold_fn = nn.Linear(args.dim, 1)
+        self.adapter_threshold_fn = nn.Linear(args.dim, 1)
         self.max_threshold = args.max_threshold
         self.bool_weights = args.bool_weights
 
@@ -494,7 +494,7 @@ class TransformerBlock(nn.Module):
 
         # type_weights = self.adapter_type * nn.functional.softmax(self.adapter_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, adapter_type]
         type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
-        thresholds = F.sigmoid(self.threshold_fn(x)) * self.max_threshold # [bsz, seqlen, 1]
+        thresholds = F.sigmoid(self.adapter_threshold_fn(x)) * self.max_threshold # [bsz, seqlen, 1]
         adapted_type_weights = type_weights - thresholds
         selected_experts = torch.ge(adapted_type_weights, 0).to(torch.float)
 

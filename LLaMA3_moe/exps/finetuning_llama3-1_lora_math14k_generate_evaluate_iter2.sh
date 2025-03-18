@@ -33,14 +33,14 @@ p_adapter_hydra=True
 prompt_layers="0-0"
 prompt_len=10
 
-blr=6e-3
+blr=0.012
 flash_attention2=False
 bf16=True
-tag=""
-batch_size_gpu=2
-eff_batch_size=32
+tag="iter2"
+batch_size_gpu=4
+# eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_moe/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_padapterhydra${p_adapter_hydra}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_moe/${dataset}/b${batch_size_gpu}_gpu${num_devices}_epoch${epochs}_warme1_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_padapterhydra${p_adapter_hydra}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
@@ -58,7 +58,7 @@ torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --prompt_len $prompt_len \
     --max_seq_len $max_seq_len \
     --batch_size  $batch_size_gpu \
-    --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \
+    --accum_iter 2 \
     --epochs ${epochs} \
     --warmup_epochs 1 \
     --blr ${blr} \
