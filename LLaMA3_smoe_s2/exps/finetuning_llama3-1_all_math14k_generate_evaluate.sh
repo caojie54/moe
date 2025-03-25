@@ -20,14 +20,14 @@ max_seq_len=300
 min_gen_len=120
 max_gen_len=200
 
-bool_weights=True
+bool_weights=False
 max_threshold=0.5
 
 swi_x=4
 
-num_experts=8 # moe when num_experts > 1
+num_experts=4 # moe when num_experts > 1
 moe_type='adamole' # adamole, topk
-top_k=2 # top_k experts in topk moe
+top_k=0 # top_k experts in topk moe
 noisy_router=False # moe router
 lb_loss=False # moe load balancing loss
 lb_loss_coeff=0 # moe load balancing loss coefficient
@@ -38,7 +38,7 @@ lora_rank=8
 lora_targets="Q,K,V,O,FFN_DOWN"
 lora_alpha=8
 
-p_adapter_layers="0-0"
+p_adapter_layers="0-32"
 p_adapter_size=16
 
 prompt_layers="0-0"
@@ -47,11 +47,11 @@ prompt_len=10
 blr=6e-3
 flash_attention2=False
 bf16=True
-tag="sigmoid"
-batch_size_gpu=2
+tag="fixth"
+batch_size_gpu=4
 eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_smoe_s2/${dataset}/b${eff_batch_size}_e${epochs}_we${warmup_epochs}_maxthre${max_threshold}_boolw${bool_weights}_swi_x${swi_x}_num_e${num_experts}_moe_type${moe_type}_top_k${top_k}_noisy${noisy_router}_lb${lb_loss}_lb_co${lb_loss_coeff}_asym${asym}_loral${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_palayers${p_adapter_layers}_pasize${p_adapter_size}_promptl${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}/"
+output_dir="${path}/outputs/LLaMA3-1_smoe_s2/${dataset}/gpu${num_devices}_bsg${batch_size_gpu}_e${epochs}_we${warmup_epochs}_maxthre${max_threshold}_boolw${bool_weights}_swi_x${swi_x}_num_e${num_experts}_moe_type${moe_type}_top_k${top_k}_noisy${noisy_router}_lb${lb_loss}_lb_co${lb_loss_coeff}_asym${asym}_loral${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_palayers${p_adapter_layers}_pasize${p_adapter_size}_promptl${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \

@@ -548,8 +548,8 @@ class TransformerBlock(nn.Module):
         if self.bool_weights: # disard experts that weights less than threshold or use 0,1 by selected_experts
             type_weights = selected_experts
         else:
-            # type_weights = type_weights * selected_experts # 尝试直接使用 adapted_type_weights
-            type_weights = adapted_type_weights * selected_experts # 尝试直接使用 adapted_type_weights
+            type_weights = type_weights * selected_experts # 
+            # type_weights = adapted_type_weights * selected_experts # 尝试直接使用 adapted_type_weights
 
         type_idx = 0
         h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask, type_weight=type_weights[:,:,type_idx:type_idx+self.attention_type])
