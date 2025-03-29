@@ -27,7 +27,7 @@ lora_alpha=8
 
 expert_num=8
 adamole=True
-noisy_router=True
+noisy_router=False
 lb_loss_coeff=0
 
 blr=6e-3
@@ -39,52 +39,53 @@ eff_batch_size=32
 path="/home2/caojie"
 output_dir="${path}/outputs/LLaMA3-1_smoe/${dataset}/b${eff_batch_size}_epoch${epochs}_warme${warmup_epochs}_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_adamole${adamole}_noisy_router${noisy_router}_lb_loss_coeff${lb_loss_coeff}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
-torchrun --nproc_per_node $num_devices --master_port=3031 main_finetune.py \
-    --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
-    --data_path ${path}/datasets/${dataset}/train.json \
-    --expert_num $expert_num \
-    --noisy_router $noisy_router \
-    --adamole $adamole \
-    --lb_loss_coeff $lb_loss_coeff \
-    --lora_layers $lora_layers \
-    --lora_rank ${lora_rank} \
-    --lora_targets $lora_targets \
-    --lora_alpha $lora_alpha \
-    --max_seq_len $max_seq_len \
-    --batch_size  $batch_size_gpu \
-    --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \
-    --epochs ${epochs} \
-    --warmup_epochs $warmup_epochs \
-    --blr ${blr} \
-    --flash_attention2 $flash_attention2 \
-    --bf16 $bf16 \
-    --weight_decay 0.02 \
-    --output_dir $output_dir \
-    --num_workers 10
+# torchrun --nproc_per_node $num_devices --master_port=3031 main_finetune.py \
+#     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
+#     --data_path ${path}/datasets/${dataset}/train.json \
+#     --expert_num $expert_num \
+#     --noisy_router $noisy_router \
+#     --adamole $adamole \
+#     --lb_loss_coeff $lb_loss_coeff \
+#     --lora_layers $lora_layers \
+#     --lora_rank ${lora_rank} \
+#     --lora_targets $lora_targets \
+#     --lora_alpha $lora_alpha \
+#     --max_seq_len $max_seq_len \
+#     --batch_size  $batch_size_gpu \
+#     --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \
+#     --epochs ${epochs} \
+#     --warmup_epochs $warmup_epochs \
+#     --blr ${blr} \
+#     --flash_attention2 $flash_attention2 \
+#     --bf16 $bf16 \
+#     --weight_decay 0.02 \
+#     --output_dir $output_dir \
+#     --num_workers 10
 
-checkpoint="${output_dir}checkpoint-$((epochs-1)).pth"
-# get lora parameters
-python extract_adapter_from_checkpoint.py --checkpoint $checkpoint
+# checkpoint="${output_dir}checkpoint-$((epochs-1)).pth"
+# # get lora parameters
+# python extract_adapter_from_checkpoint.py --checkpoint $checkpoint
 
 adapter_path="${output_dir}adapter.pth"
 
 
-test_dataset_l="AddSub AQuA gsm8k MultiArith SingleEq SVAMP"
+test_dataset_l="AddSub gsm8k"
 
 for test_dataset in $test_dataset_l
 do
-save_path="${output_dir}${test_dataset}_predict_mingen${min_gen_len}.jsonl"
-torchrun --nproc_per_node $num_devices --master_port=3031 example.py \
+save_path="${output_dir}${test_dataset}_mingen${min_gen_len}_getTime.jsonl"
+torchrun --nproc_per_node $num_devices --master_port=3931 example_time.py \
     --ckpt_dir ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --adapter_path $adapter_path \
     --data_path ${path}/datasets/math_commonsense/${test_dataset}/test.json \
     --save_path $save_path \
     --max_gen_len $max_gen_len \
     --min_gen_len $min_gen_len \
-    --max_batch_size 64 \
+    --max_batch_size 400 \
+    --time_gen True \
     --temperature 0.1 \
     --top_p 0.75
 done
 
-save_path1="${output_dir}AddSub_predict_mingen${min_gen_len}.jsonl"
-python evaluate_math.py --predict_file $save_path1
+# save_path1="${output_dir}AddSub_predict_mingen${min_gen_len}.jsonl"
+# python evaluate_math.py --predict_file $save_path1

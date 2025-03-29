@@ -451,18 +451,33 @@ class FeedForward(nn.Module):
             if 'FFN_UP' in self.lora_targets:
                 self.lora_UP = MOELoraLayer(args.dim, hidden_dim, args.lora_rank, args.lora_alpha)
 
+            if 'FFN_GATE' in self.lora_targets:
+                self.lora_GATE = MOELoraLayer(args.dim, hidden_dim, args.lora_rank, args.lora_alpha)
+                                              
             if 'FFN_DOWN' in self.lora_targets:
                 self.lora_DOWN = MOELoraLayer(hidden_dim, args.dim, args.lora_rank, args.lora_alpha)
 
     def forward(self, x, type_weight:Optional[torch.Tensor]):
         if self.w_lora:
             type_idx = 0
+            # if 'FFN_UP' in self.lora_targets:
+            #     out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx]))
+            #     type_idx += 1
+            # else:
+            #     out = F.silu(self.w1(x)) * self.w3(x)
+
             if 'FFN_UP' in self.lora_targets:
-                out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx]))
+                out = self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx])
                 type_idx += 1
             else:
-                out = F.silu(self.w1(x)) * self.w3(x)
-            
+                out = self.w3(x)
+
+            if 'FFN_GATE' in self.lora_targets:
+                out = F.silu(self.w1(x) + self.lora_GATE(x, type_weight[:,:,type_idx])) * out 
+                type_idx += 1
+            else:
+                out = F.silu(self.w1(x)) * out
+
             if 'FFN_DOWN' in self.lora_targets:
                 out = self.w2(out) + self.lora_DOWN(out, type_weight[:,:,type_idx])
             else:
@@ -499,7 +514,7 @@ class TransformerBlock(nn.Module):
             lora_targets = args.lora_targets.split(',')
             self.adapter_type += len(lora_targets)
             attention_targets = ['Q', 'K', 'V', 'O']
-            FFN_targets = ['FFN_UP', 'FFN_DOWN']
+            FFN_targets = ['FFN_UP', 'FFN_GATE', 'FFN_DOWN']
             for x in lora_targets:
                 if x in attention_targets:
                     self.attention_type += 1
@@ -531,12 +546,12 @@ class TransformerBlock(nn.Module):
 
         # type_weights = self.adapter_type * nn.functional.softmax(self.adapter_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, adapter_type]
         type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
-        if self.noisy:
-            #Noise logits
-            noise_logits = self.adapter_noise_linear(x)
-            #Adding scaled unit gaussian noise to the logits
-            noise = torch.randn_like(type_weights)*F.softplus(noise_logits)
-            type_weights = type_weights + noise
+        # if self.noisy:
+        #     #Noise logits
+        #     noise_logits = self.adapter_noise_linear(x)
+        #     #Adding scaled unit gaussian noise to the logits
+        #     noise = torch.randn_like(type_weights)*F.softplus(noise_logits)
+        #     type_weights = type_weights + noise
             
         if self.const_threshold:
             thresholds = self.max_threshold
@@ -545,11 +560,12 @@ class TransformerBlock(nn.Module):
         adapted_type_weights = type_weights - thresholds
         selected_experts = torch.ge(adapted_type_weights, 0).to(torch.float)
 
-        if self.bool_weights: # disard experts that weights less than threshold or use 0,1 by selected_experts
-            type_weights = selected_experts
-        else:
-            type_weights = type_weights * selected_experts # 
-            # type_weights = adapted_type_weights * selected_experts # 尝试直接使用 adapted_type_weights
+        # if self.bool_weights: # disard experts that weights less than threshold or use 0,1 by selected_experts
+        #     type_weights = selected_experts
+        # else:
+        #     type_weights = type_weights * selected_experts # 
+        type_weights = type_weights * selected_experts # 
+        # type_weights = adapted_type_weights * selected_experts # 尝试直接使用 adapted_type_weights
 
         type_idx = 0
         h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask, type_weight=type_weights[:,:,type_idx:type_idx+self.attention_type])
@@ -565,6 +581,12 @@ class TransformerBlock(nn.Module):
         out = residual + out
 
         return out
+
+        # # router 分布, 不统计时需要注释掉
+        # # batch sum
+        # sum_weights = torch.sum(type_weights, (0,1)) # [adapter_type]
+        # sum_threshold = torch.sum(thresholds, (0,1)) # [1]
+        # return out, sum_weights, sum_threshold
 
 
 class Transformer(nn.Module):

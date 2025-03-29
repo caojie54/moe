@@ -551,32 +551,18 @@ class FeedForward(nn.Module):
             if 'FFN_UP' in self.lora_targets:
                 self.lora_UP = MOELoraLayer(args.dim, hidden_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
 
-            if 'FFN_GATE' in self.lora_targets:
-                self.lora_GATE = MOELoraLayer(args.dim, hidden_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
-
             if 'FFN_DOWN' in self.lora_targets:
                 self.lora_DOWN = MOELoraLayer(hidden_dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
 
     def forward(self, x, type_weight:Optional[torch.Tensor]):
         if self.w_lora:
             type_idx = 0
-            # if 'FFN_UP' in self.lora_targets:
-            #     out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx]))
-            #     type_idx += 1
-            # else:
-            #     out = F.silu(self.w1(x)) * self.w3(x)
             if 'FFN_UP' in self.lora_targets:
-                out = self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx])
+                out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx]))
                 type_idx += 1
             else:
-                out = self.w3(x)
-
-            if 'FFN_GATE' in self.lora_targets:
-                out = F.silu(self.w1(x) + self.lora_GATE(x, type_weight[:,:,type_idx])) * out 
-                type_idx += 1
-            else:
-                out = F.silu(self.w1(x)) * out
-
+                out = F.silu(self.w1(x)) * self.w3(x)
+            
             if 'FFN_DOWN' in self.lora_targets:
                 out = self.w2(out) + self.lora_DOWN(out, type_weight[:,:,type_idx])
             else:
@@ -613,7 +599,7 @@ class TransformerBlock(nn.Module):
             lora_targets = args.lora_targets.split(',')
             self.adapter_type += len(lora_targets)
             attention_targets = ['Q', 'K', 'V', 'O']
-            FFN_targets = ['FFN_UP', 'FFN_GATE', 'FFN_DOWN']
+            FFN_targets = ['FFN_UP', 'FFN_DOWN']
             for x in lora_targets:
                 if x in attention_targets:
                     self.attention_type += 1
@@ -630,11 +616,18 @@ class TransformerBlock(nn.Module):
         elif args.swi_x > 0:
             self.adapter_type_router = Router(args.dim, self.adapter_type * args.swi_x, self.adapter_type)
 
+        self.type_weights = None
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
 
         # type_weights = self.adapter_type * nn.functional.softmax(self.adapter_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, adapter_type]
-        type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        # type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        # instance level
+        type_weights = None
+        if start_pos == 0:
+            self.type_weights = nn.functional.sigmoid(self.adapter_type_router(torch.mean(x, 1, keepdim=True, dtype=x.dtype))).to(x.dtype)   # [bsz, 1, adapter_type]
+        type_weights = self.type_weights
+        
         type_idx = 0
         h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask, type_weight=type_weights[:,:,type_idx:type_idx+self.attention_type])
         # out = h + self.feed_forward.forward(self.ffn_norm(h))
@@ -651,11 +644,6 @@ class TransformerBlock(nn.Module):
         if not self.bf16:
             out = out.clamp(min=-65500, max=65500)
         return out
-
-        # # router 分布, 不统计时需要注释掉
-        # # batch sum
-        # sum_weights = torch.sum(type_weights, (0,1)) # [adapter_type]
-        # return out, sum_weights
 
 
 class Transformer(nn.Module):

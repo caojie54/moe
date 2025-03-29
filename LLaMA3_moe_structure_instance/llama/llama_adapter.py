@@ -10,7 +10,7 @@ from .tokenizer import Tokenizer
 from .utils import sample_top_p
 
 from typing import List
-import time
+
 
 class LLaMA_adapter(nn.Module):
 
@@ -32,26 +32,19 @@ class LLaMA_adapter(nn.Module):
             max_seq_len=args.max_seq_len,
             max_batch_size=args.max_batch_size,
             w_bias = args.w_bias,
-
             lora_layers = args.lora_layers,
             lora_rank = args.lora_rank,
             lora_targets = args.lora_targets,
             lora_alpha = args.lora_alpha,
-
             expert_num = args.expert_num,
-            top_k= args.top_k,
-            adamole = args.adamole,
-            noisy_router= args.noisy_router,
-            lb_loss_coeff= args.lb_loss_coeff,
-
+            swi_x= args.swi_x,
+            hydra_moe = args.hydra_moe,
             p_adapter_layers = args.p_adapter_layers,
             p_adapter_size = args.p_adapter_size,
             p_adapter_hydra = args.p_adapter_hydra,
-
             prompt_layers = args.prompt_layers,
             prompt_len = args.prompt_len,
             expert_weight = args.expert_weight,
-            
             flash_attention2=args.flash_attention2,
             bf16=bf16,
             **params
@@ -105,20 +98,6 @@ class LLaMA_adapter(nn.Module):
                 if 'lora' in name or 'prompt' in name or 'adapter' in name:
                     para.data = para.data.float()
                     para.requires_grad = True
-    
-    def get_aux_loss(self) -> torch.Tensor:
-        """
-        Get the load balancing loss for the whole model
-        """
-        # lb_loss = torch.tensor(0, dtype=torch.float).to(self.llama.device)
-        lb_loss = torch.tensor(0, dtype=torch.float).cuda()
-
-        for name, module in self.llama.named_modules():
-            if hasattr(module, 'get_lb_loss'):
-                load_balancing_loss = module.load_balancing_loss
-                lb_loss += load_balancing_loss
-
-        return lb_loss
 
     def forward(self, tokens, labels, prompt_mask):
 
@@ -144,10 +123,7 @@ class LLaMA_adapter(nn.Module):
         else:
             # assert self.llama.vocab_size == 32000
             c_loss = self.criterion(output.reshape(-1, self.llama.vocab_size), labels.flatten())
-        
-            # load balancing loss
-            lb_loss = self.get_aux_loss()
-            c_loss += self.model_args.lb_loss_coeff * lb_loss
+
         return c_loss, c_loss
 
     @torch.inference_mode()
@@ -231,87 +207,3 @@ class LLaMA_adapter(nn.Module):
             decoded.append(self.tokenizer.decode(t))
 
         return decoded
-    
-
-    @torch.inference_mode()
-    def generate_time(
-        self, 
-        prompts,
-        max_gen_len: int = 256,
-        temperature: float = 0.1,
-        top_p: float = 0.75,
-        time_gen: bool = False
-    ):
-        bsz = len(prompts)
-        params = self.llama.params
-        assert bsz <= params.max_batch_size, (bsz, params.max_batch_size)
-
-        # if isinstance(prompts[0], str):
-        #     prompts = [self.tokenizer.encode(x, bos=True, eos=False) for x in prompts]
-
-        min_prompt_size = min([len(t) for t in prompts])
-        max_prompt_size = max([len(t) for t in prompts])
-
-        total_len = min(params.max_seq_len, max_gen_len + max_prompt_size)
-
-        tokens = torch.full((bsz, total_len), self.tokenizer.pad_id).cuda().long()
-
-        for k, t in enumerate(prompts):
-            tokens[k, : len(t)] = torch.tensor(t).cuda().long()
-        input_text_mask = tokens != self.tokenizer.pad_id
-        start_pos = min_prompt_size
-        prev_pos = 0
-
-        if time_gen:
-            prefill_time = None
-            end_time = None
-            start_time = time.time()
-
-        for cur_pos in range(start_pos, total_len):
-            if params.bf16:
-                dt = torch.bfloat16
-            else:
-                dt = torch.float16
-            with torch.cuda.amp.autocast(dtype=dt):
-                logits = self.forward_inference(tokens[:, prev_pos:cur_pos], prev_pos)
-
-            # prefill time
-            if time_gen and cur_pos == start_pos:
-                prefill_time = time.time()
-
-            if temperature > 0:
-                probs = torch.softmax(logits / temperature, dim=-1)
-                next_token = sample_top_p(probs, top_p)
-            else:
-                next_token = torch.argmax(logits, dim=-1)
-            next_token = next_token.reshape(-1)
-
-            next_token = torch.where(
-                input_text_mask[:, cur_pos], tokens[:, cur_pos], next_token
-            )
-            tokens[:, cur_pos] = next_token
-            # trick: early stop if bsz==1
-            if bsz == 1 and next_token[0] == self.tokenizer.eos_id:
-                break
-            prev_pos = cur_pos
-
-        time_cost = None
-        if time_gen: # batch time cost, set batch_size to 1 
-            end_time = time.time()
-            all_cost = end_time - start_time  
-            inference_cost = end_time - prefill_time 
-            time_cost = {'all_cost':all_cost, 'inference_cost':inference_cost}
-
-        decoded = []
-        for i, t in enumerate(tokens.tolist()):
-
-            # cut to max gen len
-            t = t[len(prompts[i]): len(prompts[i]) + max_gen_len]
-            # cut to eos tok if any
-            try:
-                t = t[: t.index(self.tokenizer.eos_id)]
-            except ValueError:
-                pass
-            decoded.append(self.tokenizer.decode(t))
-
-        return decoded, time_cost

@@ -33,7 +33,7 @@ p_adapter_hydra=True
 prompt_layers="0-32"
 prompt_len=10
 
-swi_x=4
+swi_x=0
 
 blr=6e-3
 flash_attention2=False

@@ -25,7 +25,7 @@ max_threshold=0.5
 
 swi_x=4
 
-num_experts=4 # moe when num_experts > 1
+num_experts=8 # moe when num_experts > 1
 moe_type='adamole' # adamole, topk
 top_k=0 # top_k experts in topk moe
 noisy_router=False # moe router
@@ -48,7 +48,7 @@ blr=6e-3
 flash_attention2=False
 bf16=True
 tag="fixth"
-batch_size_gpu=4
+batch_size_gpu=2
 eff_batch_size=32
 path="/home2/caojie"
 output_dir="${path}/outputs/LLaMA3-1_smoe_s2/${dataset}/gpu${num_devices}_bsg${batch_size_gpu}_e${epochs}_we${warmup_epochs}_maxthre${max_threshold}_boolw${bool_weights}_swi_x${swi_x}_num_e${num_experts}_moe_type${moe_type}_top_k${top_k}_noisy${noisy_router}_lb${lb_loss}_lb_co${lb_loss_coeff}_asym${asym}_loral${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_palayers${p_adapter_layers}_pasize${p_adapter_size}_promptl${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}/"
