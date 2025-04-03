@@ -39,7 +39,7 @@ eff_batch_size=32
 path="/home2/caojie"
 output_dir="${path}/outputs/LLaMA3-1_smoe/${dataset}/b${eff_batch_size}_epoch${epochs}_warme${warmup_epochs}_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_top_k${top_k}_noisy_router${noisy_router}_lb_loss_coeff${lb_loss_coeff}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
-torchrun --nproc_per_node $num_devices --master_port=3031 main_finetune.py \
+torchrun --nproc_per_node $num_devices --master_port=3131 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --data_path ${path}/datasets/${dataset}/train.json \
     --expert_num $expert_num \
@@ -74,7 +74,7 @@ test_dataset_l="AddSub AQuA gsm8k MultiArith SingleEq SVAMP"
 for test_dataset in $test_dataset_l
 do
 save_path="${output_dir}${test_dataset}_predict_mingen${min_gen_len}.jsonl"
-torchrun --nproc_per_node $num_devices --master_port=3031 example.py \
+torchrun --nproc_per_node $num_devices --master_port=3131 example.py \
     --ckpt_dir ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --adapter_path $adapter_path \
     --data_path ${path}/datasets/math_commonsense/${test_dataset}/test.json \

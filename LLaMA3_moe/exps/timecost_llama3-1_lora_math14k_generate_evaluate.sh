@@ -23,8 +23,8 @@ lora_layers="0-32"
 lora_rank=8
 lora_targets="Q,K,V,O,FFN_DOWN"
 lora_alpha=8
-hydra_moe=False # hydra lora, Asymmetric LoRA
-expert_num=4
+hydra_moe=True # hydra lora, Asymmetric LoRA
+expert_num=8
 
 p_adapter_layers="0-0"
 p_adapter_size=16
@@ -37,7 +37,7 @@ blr=6e-3
 flash_attention2=False
 bf16=True
 tag=""
-batch_size_gpu=2
+batch_size_gpu=4
 eff_batch_size=32
 path="/home2/caojie"
 output_dir="${path}/outputs/LLaMA3-1_moe/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_padapterhydra${p_adapter_hydra}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
@@ -87,7 +87,7 @@ torchrun --nproc_per_node $num_devices --master_port=3531 example_time.py \
     --save_path $save_path \
     --max_gen_len $max_gen_len \
     --min_gen_len $min_gen_len \
-    --max_batch_size 400 \
+    --max_batch_size 350 \
     --time_gen True \
     --temperature 0.1 \
     --top_p 0.75

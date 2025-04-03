@@ -24,7 +24,7 @@ lora_rank=8
 lora_targets="Q,K,V,O,FFN_DOWN"
 lora_alpha=8
 hydra_moe=False # hydra lora, Asymmetric LoRA
-expert_num=4
+expert_num=8
 
 p_adapter_layers="0-0"
 p_adapter_size=16

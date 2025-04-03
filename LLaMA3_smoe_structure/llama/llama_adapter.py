@@ -347,7 +347,7 @@ class LLaMA_adapter(nn.Module):
         start_pos = min_prompt_size
         prev_pos = 0
 
-        layer_stat = {}
+        layer_stat = {'token_num':0}
         for cur_pos in range(start_pos, total_len):
             if params.bf16:
                 dt = torch.bfloat16
@@ -355,6 +355,8 @@ class LLaMA_adapter(nn.Module):
                 dt = torch.float16
             with torch.cuda.amp.autocast(dtype=dt):
                 logits, layer_stat = self.forward_inference_router_stat(tokens[:, prev_pos:cur_pos], prev_pos, layer_stat)
+            
+            layer_stat['token_num'] += bsz * (cur_pos-prev_pos)
 
             if temperature > 0:
                 probs = torch.softmax(logits / temperature, dim=-1)
@@ -371,8 +373,6 @@ class LLaMA_adapter(nn.Module):
             if bsz == 1 and next_token[0] == self.tokenizer.eos_id:
                 break
             prev_pos = cur_pos
-
-        layer_stat['token_num'] = bsz * total_len
 
         decoded = []
         for i, t in enumerate(tokens.tolist()):

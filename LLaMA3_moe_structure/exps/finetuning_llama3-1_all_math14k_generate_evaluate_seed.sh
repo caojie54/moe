@@ -1,11 +1,11 @@
-# export CUDA_VISIBLE_DEVICES="0,1"
+# export CUDA_VISIBLE_DEVICES="0"
 
 # Count the number of devices
 num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=2
+max_devices=1
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -14,10 +14,10 @@ fi
 
 # train
 epochs=2
-dataset="commonsense_15k"
-max_seq_len=200
-min_gen_len=10
-max_gen_len=40
+dataset="math_14k"
+max_seq_len=300
+min_gen_len=120
+max_gen_len=200
 
 lora_layers="0-32"
 lora_rank=8
@@ -33,12 +33,12 @@ p_adapter_hydra=True
 prompt_layers="0-32"
 prompt_len=10
 
-swi_x=0
+swi_x=4
 
 blr=6e-3
 flash_attention2=False
 bf16=True
-tag="sigmoid"
+tag="seed12251G1"
 batch_size_gpu=8
 eff_batch_size=32
 path="/home2/caojie"
@@ -53,6 +53,7 @@ torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --lora_targets $lora_targets \
     --lora_alpha $lora_alpha \
     --hydra_moe $hydra_moe \
+    --seed 1225 \
     --p_adapter_layers $p_adapter_layers \
     --p_adapter_size $p_adapter_size \
     --p_adapter_hydra $p_adapter_hydra \
@@ -78,9 +79,7 @@ python extract_adapter_from_checkpoint.py --checkpoint $checkpoint
 adapter_path="${output_dir}adapter.pth"
 
 
-test_dataset_l="boolq piqa social_i_qa hellaswag winogrande ARC-Challenge ARC-Easy openbookqa"
-
-max_seq_len=600
+test_dataset_l="AddSub AQuA gsm8k MultiArith SingleEq SVAMP"
 
 for test_dataset in $test_dataset_l
 do
@@ -90,13 +89,12 @@ torchrun --nproc_per_node $num_devices --master_port=3038 example.py \
     --adapter_path $adapter_path \
     --data_path ${path}/datasets/math_commonsense/${test_dataset}/test.json \
     --save_path $save_path \
-    --max_seq_len $max_seq_len \
     --max_gen_len $max_gen_len \
     --min_gen_len $min_gen_len \
-    --max_batch_size 128 \
+    --max_batch_size 200 \
     --temperature 0.1 \
     --top_p 0.75
 done
 
-save_path1="${output_dir}boolq_predict_mingen${min_gen_len}.jsonl"
-python evaluate_commonsense.py --predict_file $save_path1
+save_path1="${output_dir}AddSub_predict_mingen${min_gen_len}.jsonl"
+python evaluate_math.py --predict_file $save_path1

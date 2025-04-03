@@ -31,7 +31,12 @@ while true; do
         # bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate1.sh
         # bash ./exps/finetuning_llama3-1_all_commonsense170k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate.sh
-        bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate0.sh
+        bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate_seed.sh
+        bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate_seed1.sh
+        bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate_seed2.sh
+        bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate_seed.sh
+        bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate_seed1.sh
+        bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate_seed2.sh
         # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate01.sh
         # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate02.sh
         # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate04.sh

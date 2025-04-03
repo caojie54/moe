@@ -5,7 +5,7 @@ num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=2
+max_devices=1
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -20,29 +20,21 @@ min_gen_len=10
 max_gen_len=40
 
 lora_layers="0-32"
-lora_rank=8
+lora_rank=16
 lora_targets="Q,K,V,O,FFN_DOWN"
-lora_alpha=8
-hydra_moe=True # hydra lora, Asymmetric LoRA
+lora_alpha=16
+hydra_moe=False # hydra lora, Asymmetric LoRA
 expert_num=1
-
-p_adapter_layers="0-32"
-p_adapter_size=16
-p_adapter_hydra=True
-
-prompt_layers="0-32"
-prompt_len=10
-
-swi_x=0
 
 blr=6e-3
 flash_attention2=False
 bf16=True
-tag="sigmoid"
+seed=0125
+tag=""
 batch_size_gpu=8
 eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_lora_moe_structure/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_padapterhydra${p_adapter_hydra}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_swi_x${swi_x}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_moe/${dataset}/b${batch_size_gpu}_gpu${num_devices}_epoch${epochs}_warme1_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_seed${seed}_${tag}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
@@ -53,12 +45,7 @@ torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --lora_targets $lora_targets \
     --lora_alpha $lora_alpha \
     --hydra_moe $hydra_moe \
-    --p_adapter_layers $p_adapter_layers \
-    --p_adapter_size $p_adapter_size \
-    --p_adapter_hydra $p_adapter_hydra \
-    --prompt_layers $prompt_layers\
-    --prompt_len $prompt_len \
-    --swi_x $swi_x \
+    --seed $seed \
     --max_seq_len $max_seq_len \
     --batch_size  $batch_size_gpu \
     --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \

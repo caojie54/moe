@@ -1,11 +1,11 @@
-export CUDA_VISIBLE_DEVICES="0"
+# export CUDA_VISIBLE_DEVICES="0"
 
 # Count the number of devices
 num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=1
+max_devices=2
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -24,7 +24,7 @@ lora_rank=8
 lora_targets="Q,K,V,O,FFN_DOWN"
 lora_alpha=8
 hydra_moe=False # hydra lora, Asymmetric LoRA
-expert_num=4
+expert_num=8
 
 p_adapter_layers="0-0"
 p_adapter_size=16
@@ -90,7 +90,7 @@ torchrun --nproc_per_node $num_devices --master_port=3031 example.py \
     --max_seq_len $max_seq_len \
     --max_gen_len $max_gen_len \
     --min_gen_len $min_gen_len \
-    --max_batch_size 64 \
+    --max_batch_size 128 \
     --temperature 0.1 \
     --top_p 0.75
 done

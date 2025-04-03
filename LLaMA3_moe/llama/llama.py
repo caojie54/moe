@@ -120,6 +120,9 @@ class MOELoraLayer(nn.Module):
         # type_weight: [bsz, seqlen]
         route_weight = nn.functional.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # [bsz, seqlen, expert_num]
 
+        # 收集router权重
+        self.route_weight = route_weight
+
         result = None
         for i in range(self.expert_num):
             if self.hydra:

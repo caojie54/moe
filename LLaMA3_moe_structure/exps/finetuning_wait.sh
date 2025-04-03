@@ -27,9 +27,14 @@ while true; do
         echo "Running command on GPUs: $CUDA_VISIBLE_DEVICES"
         # bash ./exps/finetuning_llama3-1_math14k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_commonsense15k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate_seed1225.sh
-        bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate_seed.sh
+        bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate_seed1.sh
+        bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate_seed2.sh
+        bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate_seed3.sh
+        bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate_seed4.sh
+        bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate_seed5.sh
+        # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate_seed.sh
+        # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_commonsense170k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_commonsense170k_generate_evaluate2.sh
         # bash ./exps/finetuning_llama3-1_commonsense170k_generate_evaluate3.sh
