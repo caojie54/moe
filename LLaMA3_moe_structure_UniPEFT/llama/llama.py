@@ -115,18 +115,18 @@ class MOELoraLayer(nn.Module):
         return self.params_num
 
 
-    def forward(self, x: torch.Tensor, type_weight: Optional[torch.Tensor]):
+    def forward(self, x: torch.Tensor, lora_weight: Optional[torch.Tensor]):
         if self.expert_num == 1:
             result = self.lora_B(self.lora_A(x)) * self.scaling
             
-            result = torch.unsqueeze(type_weight, -1) * result
+            result = lora_weight * result
             return result
         
         # type_weight: [bsz, seqlen]
         route_weight = nn.functional.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # [bsz, seqlen, expert_num]
         # lora type weight
         
-        route_weight = route_weight * type_weight.unsqueeze(-1)
+        route_weight = route_weight * lora_weight
 
         result = None
         for i in range(self.expert_num):
@@ -190,19 +190,19 @@ class PAdapterLayer(nn.Module):
                 # nn.init.zeros_(self.up_proj_l[i].weight) # zero init like lora
                 nn.init.constant_(self.up_proj_l[i].bias, 0.0)
 
-    def forward(self, x, type_weight: Optional[torch.Tensor]):
+    def forward(self, x, padapter_weight: Optional[torch.Tensor]):
         if self.expert_num == 1:
             x = self.down_proj(x)
             x = self.adapter_act_fn(x)
             x = self.up_proj(x)
             
-            x = x * type_weight.unsqueeze(-1)
+            x = x * padapter_weight
             return x 
 
         # type_weight: [bsz, seqlen]
         route_weight = nn.functional.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # [bsz, seqlen, expert_num]
         
-        route_weight = route_weight * type_weight.unsqueeze(-1)
+        route_weight = route_weight * padapter_weight
 
         result = None
         for i in range(self.expert_num):
@@ -414,20 +414,20 @@ class Attention(nn.Module):
             ).cuda()
         return super().train(mode)
 
-    def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor], type_weight:Optional[torch.Tensor]):
+    def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor], lora_weight:Optional[torch.Tensor], prompt_gate_weight:Optional[torch.Tensor]):
         bsz, seqlen, _ = x.shape
         xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
 
         type_idx = 0
         if self.w_lora:
             if 'Q' in self.lora_targets:
-                xq = xq + self.lora_Q(x, type_weight[:,:,type_idx])
+                xq = xq + self.lora_Q(x, lora_weight)
                 type_idx += 1
             if 'K' in self.lora_targets:
-                xk = xk + self.lora_K(x, type_weight[:,:,type_idx])
+                xk = xk + self.lora_K(x, lora_weight)
                 type_idx += 1
             if 'V' in self.lora_targets:
-                xv = xv + self.lora_V(x, type_weight[:,:,type_idx])
+                xv = xv + self.lora_V(x, lora_weight)
                 type_idx += 1
 
         xq = xq.view(bsz, seqlen, self.n_local_heads, self.head_dim)
@@ -501,16 +501,16 @@ class Attention(nn.Module):
             experts_output = experts_output.permute(0,3,2,1,4).contiguous().view(bsz,seqlen,self.args.expert_num, -1)
             if self.args.expert_num >1:
                 prompt_weight = nn.functional.softmax(self.prompt_router(x), dim=-1, dtype=torch.float32).to(x.dtype)
-                prompt_weight = prompt_weight * type_weight[:,:,type_idx].unsqueeze(-1)
+                prompt_weight = prompt_weight * prompt_gate_weight
                 experts_output = torch.sum(prompt_weight.unsqueeze(-1) * experts_output, 2, keepdim=True)
             elif self.args.expert_num == 1:
-                experts_output = experts_output * type_weight[:,:,type_idx].unsqueeze(-1).unsqueeze(-1)
+                experts_output = experts_output * prompt_gate_weight.unsqueeze(-1)
             type_idx += 1
             experts_output = experts_output.squeeze(2)
             output = output + experts_output
 
         if self.w_lora and 'O' in self.lora_targets:
-            return self.wo(output) + self.lora_O(output, type_weight[:,:,type_idx])
+            return self.wo(output) + self.lora_O(output, lora_weight)
         else:
             return self.wo(output)
 
@@ -551,34 +551,20 @@ class FeedForward(nn.Module):
             if 'FFN_UP' in self.lora_targets:
                 self.lora_UP = MOELoraLayer(args.dim, hidden_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
 
-            if 'FFN_GATE' in self.lora_targets:
-                self.lora_GATE = MOELoraLayer(args.dim, hidden_dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
-
             if 'FFN_DOWN' in self.lora_targets:
                 self.lora_DOWN = MOELoraLayer(hidden_dim, args.dim, args.lora_rank, args.expert_num, args.lora_alpha, args.hydra_moe)
 
-    def forward(self, x, type_weight:Optional[torch.Tensor]):
+    def forward(self, x, lora_weight:Optional[torch.Tensor]):
         if self.w_lora:
             type_idx = 0
-            # if 'FFN_UP' in self.lora_targets:
-            #     out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx]))
-            #     type_idx += 1
-            # else:
-            #     out = F.silu(self.w1(x)) * self.w3(x)
             if 'FFN_UP' in self.lora_targets:
-                out = self.w3(x) + self.lora_UP(x, type_weight[:,:,type_idx])
+                out = F.silu(self.w1(x)) * (self.w3(x) + self.lora_UP(x, lora_weight))
                 type_idx += 1
             else:
-                out = self.w3(x)
-
-            if 'FFN_GATE' in self.lora_targets:
-                out = F.silu(self.w1(x) + self.lora_GATE(x, type_weight[:,:,type_idx])) * out 
-                type_idx += 1
-            else:
-                out = F.silu(self.w1(x)) * out
-
+                out = F.silu(self.w1(x)) * self.w3(x)
+            
             if 'FFN_DOWN' in self.lora_targets:
-                out = self.w2(out) + self.lora_DOWN(out, type_weight[:,:,type_idx])
+                out = self.w2(out) + self.lora_DOWN(out, lora_weight)
             else:
                 out = self.w2(out)
             return out
@@ -605,6 +591,7 @@ class TransformerBlock(nn.Module):
         self.w_padapter = w_padapter
         if self.w_padapter:
             self.p_adapter = PAdapterLayer(self.dim, args.p_adapter_size, args.expert_num, args.p_adapter_hydra)
+            self.p_adapter_gate = nn.Linear(args.dim, 1)
         
         self.adapter_type = 0
         self.attention_type = 0
@@ -613,53 +600,56 @@ class TransformerBlock(nn.Module):
             lora_targets = args.lora_targets.split(',')
             self.adapter_type += len(lora_targets)
             attention_targets = ['Q', 'K', 'V', 'O']
-            FFN_targets = ['FFN_UP', 'FFN_GATE', 'FFN_DOWN']
+            FFN_targets = ['FFN_UP', 'FFN_DOWN']
             for x in lora_targets:
                 if x in attention_targets:
                     self.attention_type += 1
                 if x in FFN_targets:
                     self.FFN_type += 1
+            self.lora_gate = nn.Linear(args.dim, 1)
+
         if w_prompt:
             self.adapter_type += 1
             self.attention_type += 1
+            self.prompt_gate = nn.Linear(args.dim, 1)
+
         if w_padapter:
             self.adapter_type += 1
         
-        if args.swi_x == 0:
-            self.adapter_type_router = nn.Linear(args.dim, self.adapter_type)
-        elif args.swi_x > 0:
-            self.adapter_type_router = Router(args.dim, self.adapter_type * args.swi_x, self.adapter_type)
+        # if args.swi_x == 0:
+        #     self.adapter_type_router = nn.Linear(args.dim, self.adapter_type)
+        # elif args.swi_x > 0:
+        #     self.adapter_type_router = Router(args.dim, self.adapter_type * args.swi_x, self.adapter_type)
 
+        # self.type_weights = None
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
 
         # type_weights = self.adapter_type * nn.functional.softmax(self.adapter_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, adapter_type]
-        type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        # type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        # instance level
+        if start_pos == 0:
+            mean_x = torch.mean(x, 1, keepdim=True, dtype=x.dtype)
+            self.lora_weight = nn.functional.sigmoid(self.lora_gate(mean_x)).to(x.dtype)  # [bsz, 1, 1]
+            self.prompt_weight = nn.functional.sigmoid(self.prompt_gate(mean_x)).to(x.dtype) 
+            self.padapter_weight = nn.functional.sigmoid(self.prompt_gate(mean_x)).to(x.dtype) 
+        
         type_idx = 0
-        h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask, type_weight=type_weights[:,:,type_idx:type_idx+self.attention_type])
+        h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask, lora_weight=self.lora_weight, prompt_gate_weight=self.prompt_weight)
         # out = h + self.feed_forward.forward(self.ffn_norm(h))
         type_idx += self.attention_type
         residual = h
         h = self.ffn_norm(h)
-        out = self.feed_forward.forward(h, type_weight=type_weights[:,:,type_idx:type_idx+self.FFN_type])
+        out = self.feed_forward.forward(h, lora_weight=self.lora_weight)
         type_idx += self.FFN_type
         if self.w_padapter:
-            adapter_states = self.p_adapter(h, type_weight=type_weights[:,:,type_idx])
+            adapter_states = self.p_adapter(h, padapter_weight=self.padapter_weight)
             out = out + adapter_states
         out = residual + out
 
         if not self.bf16:
             out = out.clamp(min=-65500, max=65500)
         return out
-
-        # # router 分布, 不统计时需要注释掉
-        # # batch sum
-        # sum_weights = torch.sum(type_weights, (0,1)) # [adapter_type]
-        # return out, sum_weights
-
-        # router case, 不统计时需要注释掉
-        # weights = type_weights # [bsz, seqlen, adapter_type]
-        # return out, weights
 
 
 class Transformer(nn.Module):

@@ -5,7 +5,7 @@ num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-max_devices=1
+max_devices=2
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
@@ -13,7 +13,8 @@ if [ "$num_devices" -gt "$max_devices" ]; then
 fi
 
 # train
-epochs=2
+epochs=3
+warmup_epochs=1
 dataset="commonsense_15k"
 max_seq_len=200
 min_gen_len=10
@@ -33,17 +34,17 @@ p_adapter_hydra=True
 prompt_layers="0-32"
 prompt_len=10
 
-swi_x=4
+swi_x=0
 
 blr=6e-3
 flash_attention2=False
 bf16=True
-seed=0125
+seed=1225
 tag=""
 batch_size_gpu=8
 eff_batch_size=32
 path="/home2/caojie"
-output_dir="${path}/outputs/LLaMA3-1_lora_moe_structure/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_padapterhydra${p_adapter_hydra}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_swi_x${swi_x}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_seed${seed}_${tag}/"
+output_dir="${path}/outputs/LLaMA3-1_lora_moe_structure/${dataset}/b${batch_size_gpu}_gpu${num_devices}_epoch${epochs}_warme${warmup_epochs}_loralayers${lora_layers}_lorar${lora_rank}_lora${lora_targets}_alpha${lora_alpha}_expertnum${expert_num}_hydra${hydra_moe}_padapter_layers${p_adapter_layers}_padaptersize${p_adapter_size}_padapterhydra${p_adapter_hydra}_prompt_layers${prompt_layers}_prompt_len${prompt_len}_swi_x${swi_x}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_seed${seed}_${tag}/"
 
 torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
@@ -65,7 +66,7 @@ torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
     --batch_size  $batch_size_gpu \
     --accum_iter $(($eff_batch_size/$num_devices/$batch_size_gpu)) \
     --epochs ${epochs} \
-    --warmup_epochs 1 \
+    --warmup_epochs $warmup_epochs \
     --blr ${blr} \
     --flash_attention2 $flash_attention2 \
     --bf16 $bf16 \

@@ -580,13 +580,13 @@ class TransformerBlock(nn.Module):
             out = out + adapter_states
         out = residual + out
 
-        # return out
+        return out
 
-        # router 分布, 不统计时需要注释掉
-        # batch sum
-        sum_weights = torch.sum(type_weights, (0,1)) # [adapter_type]
-        sum_threshold = torch.sum(thresholds, (0,1)) # [1]
-        return out, sum_weights, sum_threshold
+        # # router 分布, 不统计时需要注释掉
+        # # batch sum
+        # sum_weights = torch.sum(type_weights, (0,1)) # [adapter_type]
+        # sum_threshold = torch.sum(thresholds, (0,1)) # [1]
+        # return out, sum_weights, sum_threshold
 
 
 class Transformer(nn.Module):

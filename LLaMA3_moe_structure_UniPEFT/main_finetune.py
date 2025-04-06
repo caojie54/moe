@@ -50,10 +50,10 @@ def get_args_parser():
     parser.add_argument('--lora_rank', default=16, type=int, help='lora rank')
     parser.add_argument('--lora_targets', default='Q,V', type=str, help="Q,K,V,O,FFN_UP,FFN_DOWN")
     parser.add_argument('--lora_alpha', default=8, type=int, help='lora alpha')
-    # expert
     parser.add_argument('--expert_num', default=1, type=int, help='number of experts')
     parser.add_argument('--hydra_moe', type=str2bool, nargs='?', const=True, default=False, help='hydra moe')
     parser.add_argument('--expert_weight', type=str2bool, nargs='?', const=True, default=False, help='type weight for expert by expert params count ')
+
     # prompt
     parser.add_argument('--prompt_layers', default='0-0', type=str, help="")
     parser.add_argument('--prompt_len', default=10, type=int, help='')
@@ -61,6 +61,9 @@ def get_args_parser():
     parser.add_argument('--p_adapter_layers', default='0-0', type=str, help="")
     parser.add_argument('--p_adapter_size', default=16, type=int, help='')
     parser.add_argument('--p_adapter_hydra', type=str2bool, nargs='?', const=True, default=False, help='p_adapter_hydra')
+
+    # adapter type router
+    parser.add_argument('--swi_x', default=0, type=int, help='adapters type router, 0 is normal Linear, otherwise swi_x * adapter_type is hiddensize of SwiGLU router')
 
     # Optimizer parameters
     parser.add_argument('--weight_decay', type=float, default=0.05,
@@ -73,7 +76,7 @@ def get_args_parser():
     parser.add_argument('--min_lr', type=float, default=0., metavar='LR',
                         help='lower lr bound for cyclic schedulers that hit 0')
 
-    parser.add_argument('--warmup_epochs', type=float, default=1, metavar='N',
+    parser.add_argument('--warmup_epochs', type=int, default=40, metavar='N',
                         help='epochs to warmup LR')
 
     # Dataset parameters

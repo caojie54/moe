@@ -26,43 +26,24 @@ while true; do
     if [ -n "$eligible_gpus" ]; then
         export CUDA_VISIBLE_DEVICES="$eligible_gpus"
         echo "Running command on GPUs: $CUDA_VISIBLE_DEVICES"
-        # bash ./exps/finetuning_llama3-1_commonsense170k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate_iter2.sh
-        # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate1.sh
-        # bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate3.sh
-        bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate_seed1.sh
-        bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate_seed.sh
-        bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate_seed2.sh
+        # bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate_seed1.sh
+        # bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate_seed.sh
+        # bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate_seed2.sh
+        bash ./exps/finetuning_llama3-1_molora_math14k_generate_evaluate_seed.sh
+        bash ./exps/finetuning_llama3-1_molora_math14k_generate_evaluate_seed1.sh
+        bash ./exps/finetuning_llama3-1_molora_math14k_generate_evaluate_seed2.sh
         bash ./exps/finetuning_llama3-1_hydralora_math14k_generate_evaluate_seed.sh
         bash ./exps/finetuning_llama3-1_hydralora_math14k_generate_evaluate_seed1.sh
         bash ./exps/finetuning_llama3-1_hydralora_math14k_generate_evaluate_seed2.sh
-        bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate_seed.sh
-        bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate_seed1.sh
-        bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate_seed2.sh
-        bash ./exps/finetuning_llama3-1_molora_commonsense15k_generate_evaluate_seed.sh
-        bash ./exps/finetuning_llama3-1_molora_commonsense15k_generate_evaluate_seed1.sh
-        bash ./exps/finetuning_llama3-1_molora_commonsense15k_generate_evaluate_seed2.sh
-        bash ./exps/finetuning_llama3-1_hydralora_commonsense15k_generate_evaluate_seed.sh
-        bash ./exps/finetuning_llama3-1_hydralora_commonsense15k_generate_evaluate_seed1.sh
-        bash ./exps/finetuning_llama3-1_hydralora_commonsense15k_generate_evaluate_seed2.sh
-        # bash ./exps/finetuning_llama3-1_lora_math14k_generate_evaluate4.sh
-        # bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_prompt_math14k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_prompt_moe_math14k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_padapter_math14k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_padapter_moe_math14k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_padapter_moe_math14k_generate_evaluate_1.sh
-        # bash ./exps/finetuning_llama3-1_padapter_commonsense15k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_padapter_moe_commonsense15k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_prompt_commonsense15k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_prompt_moe_commonsense15k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_padapter_commonsense170k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_padapter_moe_commonsense170k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_prompt_commonsense170k_generate_evaluate.sh
-        # bash ./exps/finetuning_llama3-1_prompt_moe_commonsense170k_generate_evaluate.sh
+        # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate_seed.sh
+        # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate_seed1.sh
+        # bash ./exps/finetuning_llama3-1_lora_commonsense15k_generate_evaluate_seed2.sh
+        # bash ./exps/finetuning_llama3-1_molora_commonsense15k_generate_evaluate_seed.sh
+        # bash ./exps/finetuning_llama3-1_molora_commonsense15k_generate_evaluate_seed1.sh
+        # bash ./exps/finetuning_llama3-1_molora_commonsense15k_generate_evaluate_seed2.sh
+        # bash ./exps/finetuning_llama3-1_hydralora_commonsense15k_generate_evaluate_seed.sh
+        # bash ./exps/finetuning_llama3-1_hydralora_commonsense15k_generate_evaluate_seed1.sh
+        # bash ./exps/finetuning_llama3-1_hydralora_commonsense15k_generate_evaluate_seed2.sh
         break
     else
         echo "No GPU with more than $memory GB unused memory."

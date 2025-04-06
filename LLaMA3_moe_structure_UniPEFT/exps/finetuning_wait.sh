@@ -2,7 +2,6 @@
 # export TIKTOKEN_CACHE_DIR="/mnt/caojie/caojie/cache"
 # Loop indefinitely
 # gpu memory need
-# memory=47
 memory=45
 while true; do
     echo "Checking at $(date)"  # Print the current time
@@ -26,14 +25,13 @@ while true; do
     if [ -n "$eligible_gpus" ]; then
         export CUDA_VISIBLE_DEVICES="$eligible_gpus"
         echo "Running command on GPUs: $CUDA_VISIBLE_DEVICES"
-        # bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate_seed.sh
-        bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate_seed1.sh
-        # bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate_seed2.sh
+        bash ./exps/finetuning_llama3-1_all_math14k_generate_evaluate.sh
+        bash ./exps/finetuning_llama3-1_all_commonsense15k_generate_evaluate.sh
         break
     else
         echo "No GPU with more than $memory GB unused memory."
     fi
 
     # Wait for 5 seconds before the next check
-    sleep 3600
+    sleep 18000
 done
