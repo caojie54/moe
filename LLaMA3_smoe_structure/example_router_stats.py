@@ -196,11 +196,13 @@ def main(
                 layer_stat_all[i] = {}
                 layer_stat_all[i]['sum_weights'] =  layer_stat[i]['sum_weights'].clone()
                 layer_stat_all[i]['sum_threshold'] =  layer_stat[i]['sum_threshold'].clone()
+                layer_stat_all[i]['sum_experts'] =  layer_stat[i]['sum_experts'].clone()
             layer_stat_all['token_num'] = layer_stat['token_num']
         else:
             for i in range(len(model.llama.layers)):
                 layer_stat_all[i]['sum_weights'] +=  layer_stat[i]['sum_weights']
                 layer_stat_all[i]['sum_threshold'] +=  layer_stat[i]['sum_threshold']
+                layer_stat_all[i]['sum_experts'] +=  layer_stat[i]['sum_experts']
             layer_stat_all['token_num'] += layer_stat['token_num']
 
         with open(save_path, 'a', encoding='utf-8') as f:

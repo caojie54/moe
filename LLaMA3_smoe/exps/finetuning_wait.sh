@@ -28,20 +28,21 @@ while true; do
         echo "Running command on GPUs: $CUDA_VISIBLE_DEVICES"
         # bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate.sh
-        bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate_seed.sh
-        bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate_seed1.sh
-        bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate_seed2.sh
-        bash ./exps/finetuning_llama3-1_adamole_lora_commonsense15k_generate_evaluate_seed.sh
-        bash ./exps/finetuning_llama3-1_adamole_lora_commonsense15k_generate_evaluate_seed1.sh
-        bash ./exps/finetuning_llama3-1_adamole_lora_commonsense15k_generate_evaluate_seed2.sh
+        # bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate_seed.sh
+        # bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate_seed1.sh
+        # bash ./exps/finetuning_llama3-1_smoe_lora_math14k_generate_evaluate_seed2.sh
+        # bash ./exps/finetuning_llama3-1_adamole_lora_commonsense15k_generate_evaluate_seed.sh
+        # bash ./exps/finetuning_llama3-1_adamole_lora_commonsense15k_generate_evaluate_seed1.sh
+        # bash ./exps/finetuning_llama3-1_adamole_lora_commonsense15k_generate_evaluate_seed2.sh
         # bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate.sh
         # bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate1.sh
-        bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate_seed.sh
-        bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate_seed1.sh
-        bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate_seed2.sh
-        bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate_seed.sh
-        bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate_seed1.sh
-        bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate_seed2.sh
+        bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate_equalP_seed.sh
+        # bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate_seed.sh
+        # bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate_seed1.sh
+        # bash ./exps/finetuning_llama3-1_adamole_lora_math14k_generate_evaluate_seed2.sh
+        # bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate_seed.sh
+        # bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate_seed1.sh
+        # bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate_seed2.sh
         # bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate1.sh
         # bash ./exps/finetuning_llama3-1_smoe_lora_commonsense15k_generate_evaluate2.sh
         break

@@ -122,6 +122,10 @@ class AdaMoLE(nn.Module):
         weight_sums = torch.sum(weights, dim=-1, keepdim=True, dtype=inputs.dtype)
         weight_sums = torch.where(weight_sums == 0, torch.ones_like(weight_sums), weight_sums)
         weights = weights / weight_sums
+
+        # 收集router权重
+        self.route_weight = weights
+
         # results = torch.zeros_like(self.experts[0](flattened_inputs))
         results = torch.zeros(inputs.shape[0]*inputs.shape[1], self.output_dim, dtype=inputs.dtype, device=inputs.device)
 

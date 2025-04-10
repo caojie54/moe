@@ -652,8 +652,8 @@ class TransformerBlock(nn.Module):
             out = out.clamp(min=-65500, max=65500)
         return out
 
-        # # router 分布, 不统计时需要注释掉
-        # # batch sum
+        # router 分布, 不统计时需要注释掉
+        # batch sum
         # sum_weights = torch.sum(type_weights, (0,1)) # [adapter_type]
         # return out, sum_weights
 

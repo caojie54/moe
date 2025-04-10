@@ -544,27 +544,27 @@ class TransformerBlock(nn.Module):
 
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
 
-        # type_weights = self.adapter_type * nn.functional.softmax(self.adapter_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, adapter_type]
-        type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        # ori_type_weights = self.adapter_type * nn.functional.softmax(self.adapter_type_router(x), dim=-1, dtype=torch.float32).to(x.dtype)   # [bsz, seqlen, adapter_type]
+        ori_type_weights = nn.functional.sigmoid(self.adapter_type_router(x)).to(x.dtype)   # [bsz, seqlen, adapter_type]
         # if self.noisy:
         #     #Noise logits
         #     noise_logits = self.adapter_noise_linear(x)
         #     #Adding scaled unit gaussian noise to the logits
-        #     noise = torch.randn_like(type_weights)*F.softplus(noise_logits)
+        #     noise = torch.randn_like(ori_type_weights)*F.softplus(noise_logits)
         #     type_weights = type_weights + noise
             
         if self.const_threshold:
             thresholds = self.max_threshold
         else:
             thresholds = F.sigmoid(self.adapter_threshold_fn(x)) * self.max_threshold # [bsz, seqlen, 1]
-        adapted_type_weights = type_weights - thresholds
+        adapted_type_weights = ori_type_weights - thresholds
         selected_experts = torch.ge(adapted_type_weights, 0).to(torch.float)
 
         # if self.bool_weights: # disard experts that weights less than threshold or use 0,1 by selected_experts
         #     type_weights = selected_experts
         # else:
-        #     type_weights = type_weights * selected_experts # 
-        type_weights = type_weights * selected_experts # 
+        #     type_weights = ori_type_weights * selected_experts # 
+        type_weights = ori_type_weights * selected_experts # 
         # type_weights = adapted_type_weights * selected_experts # 尝试直接使用 adapted_type_weights
 
         type_idx = 0
@@ -584,9 +584,18 @@ class TransformerBlock(nn.Module):
 
         # # router 分布, 不统计时需要注释掉
         # # batch sum
-        # sum_weights = torch.sum(type_weights, (0,1)) # [adapter_type]
+        # sum_weights = torch.sum(type_weights, (0,1)) # [adapter_type]  阈值处理过的weights
+        # sum_weights = torch.sum(ori_type_weights, (0,1)) # [adapter_type]  没有处理过的weights
         # sum_threshold = torch.sum(thresholds, (0,1)) # [1]
-        # return out, sum_weights, sum_threshold
+        # sum_experts = torch.sum(selected_experts, (0,1,2)) # [1] batch 激活的专家总数数
+        # return out, sum_weights, sum_threshold, sum_experts
+
+        # router case, 不统计时需要注释掉
+        # if not self.const_threshold:
+        #     weights = torch.cat((type_weights, thresholds), dim=2) # [bsz, seqlen, adapter_type+1]
+        # else:
+        #     weights = type_weights
+        # return out, weights
 
 
 class Transformer(nn.Module):
