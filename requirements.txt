@@ -1,0 +1,8 @@
+fairscale
+fire
+flash-attn==2.5.8
+blobfile
+tiktoken==0.4.0
+torch
+transformers
+tensorboard
