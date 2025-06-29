@@ -409,3 +409,109 @@ class LLaMA_adapter(nn.Module):
             decoded.append(self.tokenizer.decode(t))
 
         return decoded, layer_stat
+    
+
+    # router 案例具体分析
+    @torch.inference_mode()
+    def forward_inference_router_case(self, tokens, start_pos: int, layer_stat):
+        _bsz, seqlen = tokens.shape
+        h = self.llama.tok_embeddings(tokens)
+        freqs_cis = self.llama.freqs_cis.to(h.device)
+        freqs_cis = freqs_cis[start_pos : start_pos + seqlen]
+        mask = None  
+        mask = torch.full((1, 1, seqlen, seqlen), float("-inf"), device=h.device)
+        mask = torch.triu(mask, diagonal=start_pos + 1).type_as(h) 
+        
+        for i,layer in enumerate(self.llama.layers):
+            h = layer(h, start_pos, freqs_cis, mask)
+            if start_pos == 0:
+                layer_stat[i] = {}
+                layer_stat[i]['weights'] =  layer.feed_forward.lora_DOWN.route_weight.clone() # flattened
+            else:
+                layer_stat[i]['weights'] = torch.cat((layer_stat[i]['weights'], layer.feed_forward.lora_DOWN.route_weight), dim=0)
+
+        h = self.llama.norm(h)
+        output = self.llama.output(h[:, -1, :])
+
+        return output.float(), layer_stat
+
+
+    @torch.inference_mode()
+    def generate_router_case(
+        self, 
+        prompts,
+        max_gen_len: int = 256,
+        temperature: float = 0.1,
+        top_p: float = 0.75
+    ):
+        bsz = len(prompts)
+        params = self.llama.params
+        assert bsz == 1
+
+        # if isinstance(prompts[0], str):
+        #     prompts = [self.tokenizer.encode(x, bos=True, eos=False) for x in prompts]
+
+        min_prompt_size = min([len(t) for t in prompts])
+        max_prompt_size = max([len(t) for t in prompts])
+
+        total_len = min(params.max_seq_len, max_gen_len + max_prompt_size)
+
+        tokens = torch.full((bsz, total_len), self.tokenizer.pad_id).cuda().long()
+
+        for k, t in enumerate(prompts):
+            tokens[k, : len(t)] = torch.tensor(t).cuda().long()
+        input_text_mask = tokens != self.tokenizer.pad_id
+        start_pos = min_prompt_size
+        prev_pos = 0
+
+        layer_stat = {}
+        for cur_pos in range(start_pos, total_len):
+            if params.bf16:
+                dt = torch.bfloat16
+            else:
+                dt = torch.float16
+            with torch.cuda.amp.autocast(dtype=dt):
+                logits, layer_stat = self.forward_inference_router_case(tokens[:, prev_pos:cur_pos], prev_pos, layer_stat)
+
+            # layer_stat['token_num'] += bsz * (cur_pos-prev_pos)
+
+            if temperature > 0:
+                probs = torch.softmax(logits / temperature, dim=-1)
+                next_token = sample_top_p(probs, top_p)
+            else:
+                next_token = torch.argmax(logits, dim=-1)
+            next_token = next_token.reshape(-1)
+
+            next_token = torch.where(
+                input_text_mask[:, cur_pos], tokens[:, cur_pos], next_token
+            )
+            tokens[:, cur_pos] = next_token
+            # trick: early stop if bsz==1
+            if bsz == 1 and next_token[0] == self.tokenizer.eos_id:
+                break
+            prev_pos = cur_pos
+
+        decoded = []
+        for i, t in enumerate(tokens.tolist()):
+            t0 = t[:]
+            # cut to max gen len
+            t = t[len(prompts[i]): len(prompts[i]) + max_gen_len]
+            # cut to eos tok if any
+            try:
+                t0 = t0[: t0.index(self.tokenizer.eos_id)]
+                t = t[: t.index(self.tokenizer.eos_id)]
+            except ValueError:
+                pass
+            decoded.append(self.tokenizer.decode(t))
+            print(self.tokenizer.eos_id)
+            print(self.tokenizer.pad_id)
+            print(t0)
+            words = [self.tokenizer.decode([ti]) for ti in t0]
+            layer_stat['words'] = words
+            try:
+                assert len(words) == layer_stat[0]['weights'].shape[1]
+            except Exception:
+                print(len(words), layer_stat[0]['weights'].shape[1])
+                print(words)
+                print(total_len)
+        return decoded, layer_stat
