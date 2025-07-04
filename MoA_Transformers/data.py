@@ -279,7 +279,20 @@ def format_text(example, data_name: str, prompt_only: bool = True):
         text += "Answer: "
         example['answer'] = chr(ord('A') + example['answer'])
         example['num_choices'] = 5  # undefined
-
+    elif data_name == 'math_14k':
+        PROMPT_DICT = {
+        "prompt_input": (
+            "Below is an instruction that describes a task, paired with an input that provides further context. "
+            "Write a response that appropriately completes the request.\n\n"
+            "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
+        ),
+        "prompt_no_input": (
+            "Below is an instruction that describes a task. "
+            "Write a response that appropriately completes the request.\n\n"
+            "### Instruction:\n{instruction}\n\n### Response:"
+        )}
+        text = PROMPT_DICT["prompt_no_input"].format_map(example)
+        example["answer"] = example["output"]
     else:
         raise NotImplementedError
 
