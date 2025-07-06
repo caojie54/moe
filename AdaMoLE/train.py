@@ -119,19 +119,30 @@ if __name__ == '__main__':
         # add_bos_token=True,
         add_eos_token=True,
     )
-    tokenizer.pad_token = tokenizer.eos_token
 
     # Tokenize datasets
-    tokenize_text = lambda examples: tokenizer(
-        examples["text"],
-        truncation=True,
-        max_length=max_length,
-        # padding=True,
-        # return_tensors="pt",
-    )
+    # tokenize_text = lambda examples: tokenizer(
+    #     examples["text"],
+    #     truncation=True,
+    #     max_length=max_length,
+    #     # padding=True,
+    #     # return_tensors="pt",
+    # )
+    def tokenize_text(examples):
+        out = tokenizer(examples["text"],
+                truncation=True,
+                max_length=max_length,
+                # padding=True,
+                # return_tensors="pt",
+            )
+        # print(len(examples["text"]))
+        out['input_ids'].append(tokenizer.convert_tokens_to_ids(tokenizer.eos_token))
+        out['attention_mask'].append(1)
+        return out
+
     tokenized_datasets = formatted_datasets.map(
         tokenize_text,
-        batched=True,
+        batched=False,
         remove_columns=formatted_datasets["train"].column_names,
     )
     print(f'Tokenized datasets: {tokenized_datasets}')
