@@ -343,9 +343,9 @@ class TransformerBlock(nn.Module):
     def forward(self, x: torch.Tensor, start_pos: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor]):
 
         h = x + self.attention.forward(self.attention_norm(x), start_pos, freqs_cis, mask)
-        out = h + self.feed_forward.forward(self.ffn_norm(h))
+        # out = h + self.feed_forward.forward(self.ffn_norm(h))
         
-        # 
+        # skip or repeat
         # flat_h = h.view(-1, h.size(-1))
         # logits = self.router(flat_h)
         # softmax_logits = F.softmax(logits, dim=-1)
@@ -363,9 +363,30 @@ class TransformerBlock(nn.Module):
         #                 selected_tokens = self.feed_forward.forward(self.ffn_norm(selected_tokens))
         #             flat_h[batch_idx] = selected_tokens
         # out = flat_h.view((*h.shape[:-1], flat_h.shape[-1]))
-
-        # residual 
+        # # residual 
         # out = h + out
+
+        # repeat
+        flat_h = h.view(-1, h.size(-1))
+        logits = self.router(flat_h)
+        softmax_logits = F.softmax(logits, dim=-1)
+        top_k_logits, selected_experts = softmax_logits.topk(1, dim=-1)
+        # weighted_top_k_logits = top_k_logits / torch.sum(top_k_logits, dim=-1, keepdim=True, dtype=x.dtype)
+        results = torch.zeros(h.shape[0]*h.shape[1], h.shape[-1], dtype=h.dtype, device=h.device)
+
+        for i in range(self.expert_num):
+            # batch_idx, nth_expert = torch.where(selected_experts == i)
+            batch_idx = (selected_experts == i).any(dim=-1)
+            if len(batch_idx)>0:
+                # compute FFN i times
+                selected_tokens = flat_h[batch_idx]
+                for k in range(i+1):
+                    selected_tokens = self.feed_forward.forward(self.ffn_norm(selected_tokens))
+                results[batch_idx] = selected_tokens
+        out = results.view((*h.shape[:-1], flat_h.shape[-1]))
+        # residual
+        out = h + out
+
         return out
 
 

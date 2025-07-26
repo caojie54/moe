@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES="0,1"
+export CUDA_VISIBLE_DEVICES="1"
 
 # Count the number of devices
 num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
@@ -9,7 +9,7 @@ max_devices=1
 
 if [ "$num_devices" -gt "$max_devices" ]; then
     num_devices=$max_devices
-    echo "max of devices: $max_devices"
+   echo "max of devices: $max_devices"
 fi
 
 # train
@@ -21,7 +21,7 @@ max_gen_len=200
 lora_rank=8
 w_lora=True
 lora_targets="FFN_DOWN"
-expert_num=1
+expert_num=2
 blr=6e-3
 flash_attention2=False
 bf16=True
@@ -31,7 +31,7 @@ eff_batch_size=32
 path="/data/workspace/"
 output_dir="${path}/outputs/LLaMA3-1_sr/${dataset}/b${eff_batch_size}_epoch${epochs}_warme1_lorar${lora_rank}_lora${lora_targets}_blr${blr}_maxseq${max_seq_len}_flashatt2${flash_attention2}_bf16${bf16}_${tag}/"
 
-torchrun --nproc_per_node $num_devices --master_port=3038 main_finetune.py \
+torchrun --nproc_per_node $num_devices --master_port=3138 main_finetune.py \
     --llama_path ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --data_path ${path}/datasets/${dataset}/train.json \
     --lora_rank ${lora_rank} \
@@ -62,7 +62,7 @@ test_dataset_l="AddSub AQuA gsm8k MultiArith SingleEq SVAMP"
 for test_dataset in $test_dataset_l
 do
 save_path="${output_dir}${test_dataset}_predict_mingen${min_gen_len}.jsonl"
-torchrun --nproc_per_node $num_devices --master_port=3038 example.py \
+torchrun --nproc_per_node $num_devices --master_port=3138 example.py \
     --ckpt_dir ${path}/pretrain_models/Meta-Llama-3.1-8B-Instruct/ \
     --adapter_path $adapter_path \
     --data_path ${path}/datasets/math_commonsense/${test_dataset}/test.json \
