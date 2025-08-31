@@ -111,7 +111,7 @@ class AdaMoleLayer(LoraLayer, ABC):
             self.lora_dropout[adapter_name][i],
             self.scaling[adapter_name],
         ) for i in range(num_experts)])
-        self.moe_layer[adapter_name] = AdaMoeLayer(
+        self.moe_layer[adapter_name] = AdaMoeLayer(  # 保存时，会同时保存上面的self.lora_A,以及 self.moe_layer,但是两者是相同的，加载时只需要加载self.lora_A
             experts=experts, gate=self.lora_gating[adapter_name],
             threshold_fn=self.lora_threshold[adapter_name], max_threshold=max_threshold)
 

@@ -23,6 +23,8 @@ from src import (
     LoraConfig,
     MoleConfig,
     AdaMoleConfig,
+    CoreLoraConfig,
+    MoCoreLoraConfig,
     PeftTrainer,
     PeftModelForCausalLM,
 )
@@ -42,7 +44,7 @@ if __name__ == '__main__':
         '--data_path', type=str, default='tau/commonsense_qa',
         help='huggingface data id or local data path')
     parser.add_argument(
-        '--peft_type', type=str, default='lora', choices=['lora', 'mole', 'adamole'],
+        '--peft_type', type=str, default='lora', choices=['lora', 'mole', 'adamole', 'corelora', 'mocorelora'],
         help='peft model type to be fine-tuned')
     parser.add_argument(
         '--lora_rank', type=int, default=32,
@@ -97,7 +99,7 @@ if __name__ == '__main__':
     peft_type = args.peft_type
     num_experts = args.num_experts
     max_length = args.max_length
-    lora_rank = args.lora_rank if peft_type == 'lora' else args.lora_rank // num_experts
+    lora_rank = args.lora_rank if peft_type in ('lora', 'corelora', 'mocorelora') else args.lora_rank // num_experts
     lora_alpha = 16
     lora_dropout = 0.05
     peft_type_name = peft_type
@@ -192,6 +194,25 @@ if __name__ == '__main__':
             bias="none",
             num_experts=num_experts,
             max_threshold=args.threshold,
+        )
+    elif peft_type == 'corelora':
+        peft_config = CoreLoraConfig(
+            lora_rank=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            target_modules=args.target_modules,
+            task_type=TaskType.CAUSAL_LM,
+            bias="none",
+        )
+    elif peft_type == 'mocorelora':
+        peft_config = MoCoreLoraConfig(
+            lora_rank=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            target_modules=args.target_modules,
+            task_type=TaskType.CAUSAL_LM,
+            bias="none",
+            num_experts=num_experts,
         )
     else:
         raise KeyError(f'Unsupported PEFT type: {peft_type}')

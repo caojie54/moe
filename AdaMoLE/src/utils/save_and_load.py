@@ -36,7 +36,7 @@ def get_peft_model_state_dict(
     if state_dict is None:
         state_dict = model.state_dict()
 
-    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE):
+    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE, PeftType.CoreLORA, PeftType.MoCoreLORA):
         bias = config.bias
         if bias == "none":
             to_return = {k: state_dict[k] for k in state_dict if "lora_" in k}
@@ -108,21 +108,34 @@ def set_peft_model_state_dict(model, peft_model_state_dict: dict, adapter_name="
     else:
         state_dict = peft_model_state_dict
 
-    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE):
+    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE, PeftType.CoreLORA, PeftType.MoCoreLORA):
         peft_model_state_dict = {}
         parameter_prefix = {
             PeftType.LORA: "lora_",
             PeftType.MOLE: "lora_",
             PeftType.ADAMOLE: "lora_",
+            PeftType.CoreLORA: "lora_",
+            PeftType.MoCoreLORA: "lora_",
         }[config.peft_type]
         for k, v in state_dict.items():
-            if parameter_prefix in k:
-                suffix = k.split(parameter_prefix)[1]
+            if parameter_prefix in k: 
+                # 原代码，对mocorelora，中 lora_Cores.0 等不适用，会修改layer.0 -> layer.default.0
+                # suffix = k.split(parameter_prefix)[1]
+                # if "." in suffix:
+                #     suffix_to_replace = ".".join(suffix.split(".")[1:])
+                #     k = k.replace(suffix_to_replace, f"{adapter_name}.{suffix_to_replace}")
+                # else:
+                #     k = f"{k}.{adapter_name}"
+
+                # 注意：adamole中只需要加载linear layer中的lora， 不需要加载moe_layer中的lora，save adapter时会同时保存，但两部分是一样的
+
+                suffix = parameter_prefix + k.split(parameter_prefix)[1] # lora_Cores.0
                 if "." in suffix:
-                    suffix_to_replace = ".".join(suffix.split(".")[1:])
-                    k = k.replace(suffix_to_replace, f"{adapter_name}.{suffix_to_replace}")
+                    to_replace = suffix.split(".")[0] # lora_Cores
+                    k = k.replace(to_replace, f"{to_replace}.{adapter_name}") # lora_cores.default
                 else:
-                    k = f"{k}.{adapter_name}"
+                    k = f"{k}.{adapter_name}" # for CoreLore: lora_core.default
+
                 peft_model_state_dict[k] = v
             else:
                 peft_model_state_dict[k] = v
@@ -130,4 +143,8 @@ def set_peft_model_state_dict(model, peft_model_state_dict: dict, adapter_name="
         raise NotImplementedError
 
     load_result = model.load_state_dict(peft_model_state_dict, strict=False)
+    print('\n number of missing keys:', len(load_result.missing_keys))
+    print('\n number of unexpetcted keys:', len(load_result.unexpected_keys))
+    # print('\n missing keys:', load_result.missing_keys)
+    # print('\n unexpetcted keys:', load_result.unexpected_keys)
     return load_result

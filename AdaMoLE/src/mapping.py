@@ -9,15 +9,21 @@ described in the Apache License 2.0.
 from .adamole import AdaMoleConfig, AdaMoleModel
 from .lora import LoraConfig, LoraModel
 from .mole import MoleConfig, MoleModel
+from .corelora import CoreLoraConfig, CoreLoraModel
+from .mocorelora import MoCoreLoraConfig, MoCoreLoraModel
 from .utils.peft_types import PeftType
 
 PEFT_TYPE_TO_CONFIG_MAPPING = {
     PeftType.LORA: LoraConfig,
     PeftType.MOLE: MoleConfig,
     PeftType.ADAMOLE: AdaMoleConfig,
+    PeftType.CoreLORA: CoreLoraConfig,
+    PeftType.MoCoreLORA: MoCoreLoraConfig,
 }
 PEFT_TYPE_TO_MODEL_MAPPING = {
     PeftType.LORA: LoraModel,
     PeftType.MOLE: MoleModel,
     PeftType.ADAMOLE: AdaMoleModel,
+    PeftType.CoreLORA: CoreLoraModel,
+    PeftType.MoCoreLORA: MoCoreLoraModel,
 }
