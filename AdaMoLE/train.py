@@ -6,7 +6,7 @@ import os
 import re
 
 os.environ['HF_HOME']="/data/workspace/cache/huggingface"
-os.environ['CUDA_VISIBLE_DEVICES']="0"
+# os.environ['CUDA_VISIBLE_DEVICES']="0"
 
 import torch
 import transformers
@@ -28,8 +28,6 @@ from src import (
     PeftTrainer,
     PeftModelForCausalLM,
 )
-
-transformers.set_seed(0)
 
 if __name__ == '__main__':
     # Add arguments
@@ -88,10 +86,15 @@ if __name__ == '__main__':
     parser.add_argument(
         '--aux_loss_coeff', type=float, default=None,
         help='auxiliary loss coefficient for moe')
+    parser.add_argument(
+        '--seed', type=int, default=0,
+        help='random seed for training')
 
     # Parse arguments
     args = parser.parse_args()
     print(f'Arguments: {args}')
+    transformers.set_seed(args.seed)
+
     model_path = args.model_path
     data_path = args.data_path
     model_name = os.path.basename(model_path).lower()
@@ -105,11 +108,15 @@ if __name__ == '__main__':
     peft_type_name = peft_type
     if args.top_k is not None:
         peft_type_name += f'-top{args.top_k}'
-    if args.threshold is not None:
+    if args.threshold is not None: # adamole
         threshold_name = int(1 / args.threshold)
         peft_type_name += f'-the{threshold_name}'
+    elif args.num_experts > 1:
+        peft_type_name += f'-exp{args.num_experts}'
+    if args.seed != 0:
+        peft_type_name += f'-seed{args.seed}'
     output_dir = os.path.join('outputs', re.sub(r'[^0-9a-zA-Z]', '-', f'{model_name}-{peft_type_name}-{data_name}'))
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') # useless
 
     # Load and format datasets
     formatted_datasets = get_formatted_datasets(data_path=data_path, prompt_only=False)
@@ -156,8 +163,8 @@ if __name__ == '__main__':
     # Load the base model
     base_model = AutoModelForCausalLM.from_pretrained(
         model_path,
-        torch_dtype=torch.bfloat16,
-        # device_map="auto",
+        torch_dtype=torch.bfloat16, # load with bfloat16
+        device_map="auto",  # automatically split the model across multiple GPUs
     )
     print(f'Base model loaded from {model_path}')
     print(f'Base model: {base_model}')
@@ -244,11 +251,10 @@ if __name__ == '__main__':
         lr_scheduler_type=args.lr_scheduler_type,
         warmup_steps=args.warmup_steps,
         weight_decay=args.weight_decay,
-        bf16=True,
-        bf16_full_eval=True,
-        # fsdp=True,
-        seed=0,
-        data_seed=0,
+        bf16=True, # bf16 training, otherwise fp32
+        bf16_full_eval=True, # bf16 evaluation
+        seed=args.seed,
+        data_seed=args.seed,
         report_to=["tensorboard"],
     )
     trainer = PeftTrainer(

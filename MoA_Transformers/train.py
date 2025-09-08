@@ -28,7 +28,6 @@ from src import (
     PeftModelForCausalLM,
 )
 
-transformers.set_seed(0)
 
 if __name__ == '__main__':
     # Add arguments
@@ -87,10 +86,15 @@ if __name__ == '__main__':
     parser.add_argument(
         '--aux_loss_coeff', type=float, default=None,
         help='auxiliary loss coefficient for moe')
+    parser.add_argument(
+        '--seed', type=int, default=0,
+        help='random seed for training')
 
     # Parse arguments
     args = parser.parse_args()
     print(f'Arguments: {args}')
+    transformers.set_seed(args.seed)
+
     model_path = args.model_path
     data_path = args.data_path
     model_name = os.path.basename(model_path).lower()
@@ -108,7 +112,7 @@ if __name__ == '__main__':
         threshold_name = int(1 / args.threshold)
         peft_type_name += f'-the{threshold_name}'
     output_dir = os.path.join('outputs', re.sub(r'[^0-9a-zA-Z]', '-', f'{model_name}-{peft_type_name}-{data_name}'))
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Load and format datasets
     formatted_datasets = get_formatted_datasets(data_path=data_path, prompt_only=False)
@@ -156,7 +160,7 @@ if __name__ == '__main__':
     base_model = AutoModelForCausalLM.from_pretrained(
         model_path,
         torch_dtype=torch.bfloat16,
-        # device_map="auto",
+        device_map="auto",
     )
     print(f'Base model loaded from {model_path}')
     print(f'Base model: {base_model}')
@@ -235,9 +239,8 @@ if __name__ == '__main__':
         weight_decay=args.weight_decay,
         bf16=True,
         bf16_full_eval=True,
-        # fsdp=True,
-        seed=0,
-        data_seed=0,
+        seed=args.seed,
+        data_seed=args.seed,
         report_to=["tensorboard"],
     )
     trainer = PeftTrainer(
