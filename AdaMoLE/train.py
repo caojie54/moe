@@ -103,7 +103,7 @@ if __name__ == '__main__':
     num_experts = args.num_experts
     max_length = args.max_length
     lora_rank = args.lora_rank if peft_type in ('lora', 'corelora', 'mocorelora') else args.lora_rank // num_experts
-    lora_alpha = 16
+    lora_alpha = lora_rank * 1
     lora_dropout = 0.05
     peft_type_name = peft_type
     if args.top_k is not None:
