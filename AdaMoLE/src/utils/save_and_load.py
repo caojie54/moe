@@ -36,7 +36,7 @@ def get_peft_model_state_dict(
     if state_dict is None:
         state_dict = model.state_dict()
 
-    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE, PeftType.CoreLORA, PeftType.MoCoreLORA):
+    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE, PeftType.CoreLORA, PeftType.MoCoreLORA, PeftType.MoLORA):
         bias = config.bias
         if bias == "none":
             to_return = {k: state_dict[k] for k in state_dict if "lora_" in k}
@@ -81,7 +81,7 @@ def get_peft_model_state_dict(
     elif save_embedding_layers:
         warnings.warn("Could not identify embedding layer(s) because the model is not a model in transformers.")
 
-    to_return = {k.replace(f".{adapter_name}", ""): v for k, v in to_return.items()}
+    to_return = {k.replace(f".{adapter_name}", ""): v for k, v in to_return.items()} # 为什么要去掉adaptername，加载的时候又加回来
     return to_return
 
 
@@ -108,7 +108,7 @@ def set_peft_model_state_dict(model, peft_model_state_dict: dict, adapter_name="
     else:
         state_dict = peft_model_state_dict
 
-    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE, PeftType.CoreLORA, PeftType.MoCoreLORA):
+    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE, PeftType.CoreLORA, PeftType.MoCoreLORA, PeftType.MoLORA):
         peft_model_state_dict = {}
         parameter_prefix = {
             PeftType.LORA: "lora_",
@@ -116,6 +116,7 @@ def set_peft_model_state_dict(model, peft_model_state_dict: dict, adapter_name="
             PeftType.ADAMOLE: "lora_",
             PeftType.CoreLORA: "lora_",
             PeftType.MoCoreLORA: "lora_",
+            PeftType.MoLORA: "lora_",
         }[config.peft_type]
         for k, v in state_dict.items():
             if parameter_prefix in k: 
@@ -144,7 +145,7 @@ def set_peft_model_state_dict(model, peft_model_state_dict: dict, adapter_name="
 
     load_result = model.load_state_dict(peft_model_state_dict, strict=False)
     print('\n number of missing keys:', len(load_result.missing_keys))
-    print('\n number of unexpetcted keys:', len(load_result.unexpected_keys))
+    print('\n number of unexpetcted keys:', len(load_result.unexpected_keys)) # 对adamole，mole 会加载moe_layer中的lora(不包括gate)
     # print('\n missing keys:', load_result.missing_keys)
     # print('\n unexpetcted keys:', load_result.unexpected_keys)
     return load_result

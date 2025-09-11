@@ -25,6 +25,7 @@ from src import (
     AdaMoleConfig,
     CoreLoraConfig,
     MoCoreLoraConfig,
+    MoLoraConfig,
     PeftTrainer,
     PeftModelForCausalLM,
 )
@@ -42,8 +43,11 @@ if __name__ == '__main__':
         '--data_path', type=str, default='tau/commonsense_qa',
         help='huggingface data id or local data path')
     parser.add_argument(
-        '--peft_type', type=str, default='lora', choices=['lora', 'mole', 'adamole', 'corelora', 'mocorelora'],
+        '--peft_type', type=str, default='lora', choices=['lora', 'mole', 'adamole', 'corelora', 'mocorelora', 'molora'],
         help='peft model type to be fine-tuned')
+    parser.add_argument(
+        '--hydra', type=bool, default=False, 
+        help='hydralora in molora')
     parser.add_argument(
         '--lora_rank', type=int, default=32,
         help='lora rank if the peft type is lora or total lora rank if moe')
@@ -104,8 +108,10 @@ if __name__ == '__main__':
     max_length = args.max_length
     lora_rank = args.lora_rank if peft_type in ('lora', 'corelora', 'mocorelora') else args.lora_rank // num_experts
     lora_alpha = lora_rank * 1
-    lora_dropout = 0.05
+    lora_dropout = 0
     peft_type_name = peft_type
+    if peft_type == 'molora':
+        peft_type_name += f'-hydra{args.hydra}'
     if args.top_k is not None:
         peft_type_name += f'-top{args.top_k}'
     if args.threshold is not None: # adamole
@@ -220,6 +226,17 @@ if __name__ == '__main__':
             task_type=TaskType.CAUSAL_LM,
             bias="none",
             num_experts=num_experts,
+        )
+    elif peft_type == 'molora':
+        peft_config = MoLoraConfig(
+            lora_rank=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            target_modules=args.target_modules,
+            task_type=TaskType.CAUSAL_LM,
+            bias="none",
+            num_experts=num_experts,
+            hydra=args.hydra,
         )
     else:
         raise KeyError(f'Unsupported PEFT type: {peft_type}')

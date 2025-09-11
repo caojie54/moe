@@ -1,11 +1,11 @@
-export CUDA_VISIBLE_DEVICES="2"
+export CUDA_VISIBLE_DEVICES="5"
 
 # Count the number of devices
 num_devices=$(echo $CUDA_VISIBLE_DEVICES | awk -F',' '{print NF}')
 
 echo "Number of devices: $num_devices"
 
-base_model=Qwen3-8B
+base_model=qwen3-8b
 model=lora
 
 python train.py @configs/${base_model}_${model}_math14k_train.config
