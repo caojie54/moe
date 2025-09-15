@@ -6,7 +6,7 @@ import os
 import re
 
 os.environ['HF_HOME']="/data/workspace/cache/huggingface"
-os.environ['CUDA_VISIBLE_DEVICES']="0"
+# os.environ['CUDA_VISIBLE_DEVICES']="0"
 
 import torch
 import transformers
@@ -20,14 +20,10 @@ from transformers import (
 from data import get_formatted_datasets
 from src import (
     TaskType,
-    LoraConfig,
-    MoleConfig,
-    AdaMoleConfig,
     SoftMoAConfig,
     PeftTrainer,
     PeftModelForCausalLM,
 )
-
 
 if __name__ == '__main__':
     # Add arguments
@@ -42,7 +38,7 @@ if __name__ == '__main__':
         '--data_path', type=str, default='tau/commonsense_qa',
         help='huggingface data id or local data path')
     parser.add_argument(
-        '--peft_type', type=str, default='lora', choices=['lora', 'mole', 'adamole', 'softmoa', 'sparsemoa'],
+        '--peft_type', type=str, default='lora', choices=['softmoa', 'sparsemoa'],
         help='peft model type to be fine-tuned')
     parser.add_argument(
         '--lora_rank', type=int, default=32,
@@ -103,14 +99,17 @@ if __name__ == '__main__':
     num_experts = args.num_experts
     max_length = args.max_length
     lora_rank = args.lora_rank if peft_type == 'lora' else args.lora_rank // num_experts
-    lora_alpha = 16
-    lora_dropout = 0.05
+    lora_alpha = lora_rank * 1
+    lora_dropout = 0
     peft_type_name = peft_type
     if args.top_k is not None:
         peft_type_name += f'-top{args.top_k}'
     if args.threshold is not None:
         threshold_name = int(1 / args.threshold)
         peft_type_name += f'-the{threshold_name}'
+
+    if args.seed != 0:
+        peft_type_name += f'-seed{args.seed}'
     output_dir = os.path.join('outputs', re.sub(r'[^0-9a-zA-Z]', '-', f'{model_name}-{peft_type_name}-{data_name}'))
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -166,16 +165,7 @@ if __name__ == '__main__':
     print(f'Base model: {base_model}')
 
     # Get the PEFT model
-    if peft_type == 'lora':
-        peft_config = LoraConfig(
-            lora_rank=lora_rank,
-            lora_alpha=lora_alpha,
-            lora_dropout=lora_dropout,
-            target_modules=args.target_modules,
-            task_type=TaskType.CAUSAL_LM,
-            bias="none",
-        )
-    elif peft_type == 'softmoa':
+    if peft_type == 'softmoa':
         peft_config = SoftMoAConfig(
             lora_rank=lora_rank,
             lora_alpha=lora_alpha,
@@ -184,28 +174,14 @@ if __name__ == '__main__':
             task_type=TaskType.CAUSAL_LM,
             bias="none",
         )
-    elif peft_type == 'mole':
-        peft_config = MoleConfig(
+    elif peft_type == 'sparsemoa':
+        peft_config = SoftMoAConfig(
             lora_rank=lora_rank,
             lora_alpha=lora_alpha,
             lora_dropout=lora_dropout,
             target_modules=args.target_modules,
             task_type=TaskType.CAUSAL_LM,
             bias="none",
-            num_experts=num_experts,
-            top_k=args.top_k,
-            threshold=args.threshold,
-        )
-    elif peft_type == 'adamole':
-        peft_config = AdaMoleConfig(
-            lora_rank=lora_rank,
-            lora_alpha=lora_alpha,
-            lora_dropout=lora_dropout,
-            target_modules=args.target_modules,
-            task_type=TaskType.CAUSAL_LM,
-            bias="none",
-            num_experts=num_experts,
-            max_threshold=args.threshold,
         )
     else:
         raise KeyError(f'Unsupported PEFT type: {peft_type}')

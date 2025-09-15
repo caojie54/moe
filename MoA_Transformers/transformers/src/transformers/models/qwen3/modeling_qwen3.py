@@ -149,7 +149,7 @@ class Qwen3MLP(nn.Module):
         self.act_fn = ACT2FN[config.hidden_act]
 
         lora_rank = 8
-        lora_alpha = 8
+        lora_alpha = lora_rank * 1
         self.lora_down = LoraLayer(self.intermediate_size, self.hidden_size, lora_rank, lora_alpha)
 
     def forward(self, x, type_weight:Optional[torch.Tensor]):
@@ -264,7 +264,7 @@ class Qwen3Attention(nn.Module):
         # moa
         self.num_key_value_heads = config.num_key_value_heads
         lora_rank = 8
-        lora_alpha = 8
+        lora_alpha = lora_rank * 1
         self.lora_Q = LoraLayer(config.hidden_size, config.num_attention_heads * self.head_dim, lora_rank, lora_alpha)
         self.lora_K = LoraLayer(config.hidden_size, config.num_key_value_heads * self.head_dim, lora_rank, lora_alpha)
         self.lora_V = LoraLayer(config.hidden_size, config.num_key_value_heads * self.head_dim, lora_rank, lora_alpha)
@@ -386,7 +386,7 @@ class Qwen3DecoderLayer(GradientCheckpointingLayer):
 
         # moa
         self.w_padapter = True
-        w_prompt = False
+        w_prompt = False # prompt expert need float32 or mixed precision training
         swi_x = 0
         p_adapter_size = 16
         self.p_adapter = PAdapterLayer(self.hidden_size, p_adapter_size)
@@ -394,11 +394,11 @@ class Qwen3DecoderLayer(GradientCheckpointingLayer):
         self.attention_num = 0
         self.FFN_num = 0
 
+        attention_targets = ['Q', 'K', 'V', 'O']
+        FFN_targets = ['FFN_UP', 'FFN_GATE', 'FFN_DOWN']
         lora_targets = "Q,K,V,O,FFN_DOWN"
         lora_targets = lora_targets.split(',')
         self.adapter_num += len(lora_targets)
-        attention_targets = ['Q', 'K', 'V', 'O']
-        FFN_targets = ['FFN_UP', 'FFN_GATE', 'FFN_DOWN']
         for x in lora_targets:
             if x in attention_targets:
                 self.attention_num += 1

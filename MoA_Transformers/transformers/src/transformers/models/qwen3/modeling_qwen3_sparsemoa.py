@@ -180,7 +180,7 @@ class Qwen3MLP(nn.Module):
         self.act_fn = ACT2FN[config.hidden_act]
 
         lora_rank = 8
-        lora_alpha = 8
+        lora_alpha = lora_rank * 1
         self.lora_down = LoraLayer(self.intermediate_size, self.hidden_size, lora_rank, lora_alpha)
 
     def forward(self, x, type_weight:Optional[torch.Tensor]):
@@ -295,7 +295,7 @@ class Qwen3Attention(nn.Module):
         # moa
         self.num_key_value_heads = config.num_key_value_heads
         lora_rank = 8
-        lora_alpha = 8
+        lora_alpha = lora_rank * 1
         self.lora_Q = LoraLayer(config.hidden_size, config.num_attention_heads * self.head_dim, lora_rank, lora_alpha)
         self.lora_K = LoraLayer(config.hidden_size, config.num_key_value_heads * self.head_dim, lora_rank, lora_alpha)
         self.lora_V = LoraLayer(config.hidden_size, config.num_key_value_heads * self.head_dim, lora_rank, lora_alpha)
