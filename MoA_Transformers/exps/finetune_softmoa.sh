@@ -8,7 +8,7 @@ echo "Number of devices: $num_devices"
 base_model=qwen3-8b
 model=softmoa
 
-# python train.py @configs/${base_model}_${model}_math14k_train.config
+python train.py @configs/${base_model}_${model}_math14k_train.config
 
 python test_math.py @configs/${base_model}_${model}_math14k_test.config
 
