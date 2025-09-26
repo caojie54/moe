@@ -1,3 +1,2 @@
-bash ./exps/finetune_sparsemoa.sh
-bash ./exps/finetune_sparsemoa_seed125.sh
-bash ./exps/finetune_sparsemoa_seed1225.sh
+bash ./exps/finetune_softmoa_seed125.sh
+bash ./exps/finetune_softmoa_seed1225.sh

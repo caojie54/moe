@@ -418,7 +418,7 @@ class Qwen3DecoderLayer(GradientCheckpointingLayer):
         # moa
         self.w_padapter = True
         w_prompt = False
-        swi_x = 0
+        swi_x = 4
         p_adapter_size = 16
         self.p_adapter = PAdapterLayer(self.hidden_size, p_adapter_size)
         self.adapter_num = 0
