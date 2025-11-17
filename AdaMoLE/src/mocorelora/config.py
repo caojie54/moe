@@ -13,6 +13,8 @@ class MoCoreLoraConfig(LoraConfig):
     MoCoreLORA Configuration
     """
     num_experts: int = field(default=4, metadata={"help": "The number of experts in MoE."})
+    core_router: bool = field(
+        default=False, metadata={"help": "Whether to use core router in core space."})
 
     def __post_init__(self):
         self.peft_type = PeftType.MoCoreLORA

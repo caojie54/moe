@@ -1,2 +1,2 @@
-bash ./exps/finetune_mocorelora14b_seed125.sh
-bash ./exps/finetune_mocorelora14b_seed1225.sh
+bash ./exps/finetune_mocorelora_corerouter_exp16.sh
+bash ./exps/finetune_mocorelora_corerouter_exp64.sh

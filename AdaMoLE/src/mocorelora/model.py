@@ -35,6 +35,7 @@ class MoCoreLoraModel(LoraModel):
             "lora_dropout": mocoreLora_config.lora_dropout,
             "init_lora_weights": mocoreLora_config.init_lora_weights,
             "num_experts": mocoreLora_config.num_experts,
+            "core_router": mocoreLora_config.core_router,
         }
 
         if isinstance(target, MoCoreLoraLayer):

@@ -55,6 +55,9 @@ if __name__ == '__main__':
         '--target_modules', type=str, default=['q_proj', 'v_proj'], nargs='+',
         help='target modules in lora layers')
     parser.add_argument(
+        '--core_router', type=bool, default=False, 
+        help='core router for mocorelora')
+    parser.add_argument(
         '--num_experts', type=int, default=1,
         help='number of experts in each moe layer')
     parser.add_argument(
@@ -119,6 +122,8 @@ if __name__ == '__main__':
         peft_type_name += f'-the{threshold_name}'
     elif args.num_experts > 1:
         peft_type_name += f'-exp{args.num_experts}'
+    if peft_type == 'mocorelora' and args.core_router:
+        peft_type_name += f'-corerouter'
     if args.seed != 0:
         peft_type_name += f'-seed{args.seed}'
     output_dir = os.path.join('outputs', re.sub(r'[^0-9a-zA-Z]', '-', f'{model_name}-{peft_type_name}-{data_name}'))
@@ -226,6 +231,7 @@ if __name__ == '__main__':
             task_type=TaskType.CAUSAL_LM,
             bias="none",
             num_experts=num_experts,
+            core_router=args.core_router,
         )
     elif peft_type == 'molora':
         peft_config = MoLoraConfig(

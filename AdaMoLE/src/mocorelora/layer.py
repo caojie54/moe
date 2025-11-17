@@ -43,7 +43,7 @@ class MoCoreLoraLayer(BaseTunerLayer, ABC):
 
     def update_layer(
         self, adapter_name: str, lora_rank: int, lora_alpha: int, lora_dropout: float, init_lora_weights: bool,
-        num_experts: int,
+        num_experts: int, core_router: bool = False
     ) -> None:
         """
         Update the layer
@@ -65,7 +65,10 @@ class MoCoreLoraLayer(BaseTunerLayer, ABC):
         self.lora_B[adapter_name] = nn.Linear(lora_rank, self.out_features, bias=False)
         self.scaling[adapter_name] = lora_alpha / lora_rank
 
-        self.lora_router[adapter_name] = nn.Linear(self.in_features, num_experts, bias=False)
+        if core_router:
+            self.lora_router[adapter_name] = nn.Linear(lora_rank, num_experts, bias=False)
+        else:
+            self.lora_router[adapter_name] = nn.Linear(self.in_features, num_experts, bias=False)
 
         self.reset_parameters(adapter_name, init_lora_weights)
         self.set_adapter(self.active_adapters)
@@ -97,12 +100,14 @@ class LinearMoCoreLoraLayer(nn.Module, MoCoreLoraLayer):
         lora_dropout: float = 0.0,
         init_lora_weights: bool = True,
         num_experts: int = 8,
+        core_router: bool = False,
         **kwargs,
     ) -> None:
         super().__init__()
         MoCoreLoraLayer.__init__(self, base_layer, **kwargs)
         self._active_adapter = adapter_name
-        self.update_layer(adapter_name, lora_rank, lora_alpha, lora_dropout, init_lora_weights, num_experts)
+        self.core_router = core_router
+        self.update_layer(adapter_name, lora_rank, lora_alpha, lora_dropout, init_lora_weights, num_experts, core_router)
 
     def merge(self, safe_merge: bool = False, adapter_names: Optional[list[str]] = None) -> None:
         """
@@ -135,11 +140,22 @@ class LinearMoCoreLoraLayer(nn.Module, MoCoreLoraLayer):
             lora_router = self.lora_router[active_adapter]
 
             x = x.to(lora_A.weight.dtype)
-            router_logits = F.softmax(lora_router(x), dim=-1)
+
+            lora_A_x = lora_A(dropout(x))
+            if self.core_router:
+                router_logits = F.softmax(lora_router(lora_A_x), dim=-1)
+            else:
+                router_logits = F.softmax(lora_router(x), dim=-1)
             # fuse cores
             lora_Core = torch.sum(torch.stack([core * router_logits[:, :, i].unsqueeze(-1).unsqueeze(-1) for i, core in enumerate(lora_Cores)]), dim=0)
             # print('lora_Core.shape', lora_Core.shape)
-            result += lora_B((lora_A(dropout(x)).unsqueeze(-2) @ lora_Core).squeeze(-2)) * scaling
+            result += lora_B((lora_A_x.unsqueeze(-2) @ lora_Core).squeeze(-2)) * scaling
+            
+            # router_logits = F.softmax(lora_router(x), dim=-1)
+            # # fuse cores
+            # lora_Core = torch.sum(torch.stack([core * router_logits[:, :, i].unsqueeze(-1).unsqueeze(-1) for i, core in enumerate(lora_Cores)]), dim=0)
+            # # print('lora_Core.shape', lora_Core.shape)
+            # result += lora_B((lora_A(dropout(x)).unsqueeze(-2) @ lora_Core).squeeze(-2)) * scaling
 
         result = result.to(previous_dtype)
         return result
