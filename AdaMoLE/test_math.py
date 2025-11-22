@@ -38,9 +38,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--data_path', type=str, default='/data/workspace/projects/moe/datasets/math_commonsense',
         help='huggingface data id or local data path')
-    parser.add_argument(
-        '--test_datasets', type=str, default=['AddSub','AQuA','gsm8k','MultiArith','SingleEq','SVAMP'],
-        help='test datasets')
+    # parser.add_argument(
+    #     '--test_datasets', type=str, default=['AddSub','AQuA','gsm8k','MultiArith','SingleEq','SVAMP'],
+    #     help='test datasets')
     parser.add_argument(
         '--max_new_tokens', type=int, default=256,
         help='maximum number of new tokens')
@@ -71,12 +71,30 @@ if __name__ == '__main__':
         peft_config.base_model_name_or_path,
         padding_side="left",
     )
+    
+    if 'llama' in model_name:
+        print('------------setting pad_token_id for llama 3.1')
+        tokenizer.pad_token_id = (
+            128255 # reserved special token
+        ) # llama 3.1 don't have pad_token, pad_token should be different from eos_token
+
     model = PeftModelForCausalLM.from_pretrained(model=base_model, model_id=model_path)
     model.to(device)
     print(f'Model loaded from {model_path}')
     print(f'Model: {model}')
 
-    for data_name in args.test_datasets:
+    math_datasets = ['AddSub','AQuA','gsm8k','MultiArith','SingleEq','SVAMP']
+    
+    commonsense_datasets = ["boolq", "piqa", "social_i_qa", "hellaswag", "winogrande", "ARC-Challenge", "ARC-Easy", "openbookqa"]
+
+    if 'math' in model_name:
+        datasets = math_datasets
+    elif 'commonsense' in model_name:
+        datasets = commonsense_datasets
+    else:
+        raise NotImplementedError(' not support trained model: {}'.format(model_name))
+
+    for data_name in datasets:
         data_path_1 = os.path.join(data_path, data_name)
         data_name = data_name.lower()
         # Load and format datasets

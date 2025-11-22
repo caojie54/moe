@@ -11,6 +11,8 @@ from .lora import LoraConfig, LoraModel
 from .mole import MoleConfig, MoleModel
 from .corelora import CoreLoraConfig, CoreLoraModel
 from .mocorelora import MoCoreLoraConfig, MoCoreLoraModel
+from .mocorelorash import MoCoreLoraShConfig, MoCoreLoraShModel
+from .denselora import DenseLoraConfig, DenseLoraModel
 from .molora import MoLoraConfig, MoLoraModel
 from .utils.peft_types import PeftType
 
@@ -20,6 +22,8 @@ PEFT_TYPE_TO_CONFIG_MAPPING = {
     PeftType.ADAMOLE: AdaMoleConfig,
     PeftType.CoreLORA: CoreLoraConfig,
     PeftType.MoCoreLORA: MoCoreLoraConfig,
+    PeftType.MoCoreLORASh: MoCoreLoraShConfig,
+    PeftType.DenseLORA: DenseLoraConfig,
     PeftType.MoLORA: MoLoraConfig,
 }
 PEFT_TYPE_TO_MODEL_MAPPING = {
@@ -28,5 +32,7 @@ PEFT_TYPE_TO_MODEL_MAPPING = {
     PeftType.ADAMOLE: AdaMoleModel,
     PeftType.CoreLORA: CoreLoraModel,
     PeftType.MoCoreLORA: MoCoreLoraModel,
+    PeftType.MoCoreLORASh: MoCoreLoraShModel,
+    PeftType.DenseLORA: DenseLoraModel,
     PeftType.MoLORA: MoLoraModel,
 }

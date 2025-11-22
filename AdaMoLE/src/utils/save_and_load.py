@@ -36,7 +36,7 @@ def get_peft_model_state_dict(
     if state_dict is None:
         state_dict = model.state_dict()
 
-    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE, PeftType.CoreLORA, PeftType.MoCoreLORA, PeftType.MoLORA):
+    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE, PeftType.CoreLORA, PeftType.MoCoreLORA, PeftType.MoCoreLORASh, PeftType.DenseLORA, PeftType.MoLORA):
         bias = config.bias
         if bias == "none":
             to_return = {k: state_dict[k] for k in state_dict if "lora_" in k}
@@ -108,7 +108,7 @@ def set_peft_model_state_dict(model, peft_model_state_dict: dict, adapter_name="
     else:
         state_dict = peft_model_state_dict
 
-    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE, PeftType.CoreLORA, PeftType.MoCoreLORA, PeftType.MoLORA):
+    if config.peft_type in (PeftType.LORA, PeftType.MOLE, PeftType.ADAMOLE, PeftType.CoreLORA, PeftType.MoCoreLORA, PeftType.MoCoreLORASh, PeftType.DenseLORA, PeftType.MoLORA):
         peft_model_state_dict = {}
         parameter_prefix = {
             PeftType.LORA: "lora_",
@@ -116,7 +116,9 @@ def set_peft_model_state_dict(model, peft_model_state_dict: dict, adapter_name="
             PeftType.ADAMOLE: "lora_",
             PeftType.CoreLORA: "lora_",
             PeftType.MoCoreLORA: "lora_",
+            PeftType.MoCoreLORASh: "lora_",
             PeftType.MoLORA: "lora_",
+            PeftType.DenseLORA: "lora_",
         }[config.peft_type]
         for k, v in state_dict.items():
             if parameter_prefix in k: 

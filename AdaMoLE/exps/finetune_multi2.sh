@@ -1,3 +1,2 @@
-bash ./exps/finetune_mole14b_seed125.sh
-bash ./exps/finetune_lora14b_seed1225.sh
-bash ./exps/finetune_mole14b_seed1225.sh
+bash ./exps/finetune_llama_mocorelorash_corerouter_rank32.sh
+bash ./exps/finetune_llama_mocorelorash_corerouter_rank64.sh

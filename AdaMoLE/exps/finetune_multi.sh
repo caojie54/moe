@@ -1,2 +1,2 @@
-bash ./exps/finetune_mocorelora_corerouter_exp4.sh
-bash ./exps/finetune_mocorelora_corerouter_exp32.sh
+bash ./exps/finetune_llama_denselora.sh
+bash ./exps/finetune_llama_denselora_rank32.sh

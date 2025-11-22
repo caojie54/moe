@@ -149,7 +149,8 @@ class LinearMoCoreLoraLayer(nn.Module, MoCoreLoraLayer):
             # fuse cores
             lora_Core = torch.sum(torch.stack([core * router_logits[:, :, i].unsqueeze(-1).unsqueeze(-1) for i, core in enumerate(lora_Cores)]), dim=0)
             # print('lora_Core.shape', lora_Core.shape)
-            result += lora_B((lora_A_x.unsqueeze(-2) @ lora_Core).squeeze(-2)) * scaling
+            # result += lora_B((lora_A_x.unsqueeze(-2) @ lora_Core).squeeze(-2)) * scaling
+            result += lora_B(dropout(lora_A_x.unsqueeze(-2) @ dropout(lora_Core)).squeeze(-2)) * scaling
             
             # router_logits = F.softmax(lora_router(x), dim=-1)
             # # fuse cores

@@ -25,6 +25,8 @@ from src import (
     AdaMoleConfig,
     CoreLoraConfig,
     MoCoreLoraConfig,
+    MoCoreLoraShConfig,
+    DenseLoraConfig,
     MoLoraConfig,
     PeftTrainer,
     PeftModelForCausalLM,
@@ -43,7 +45,7 @@ if __name__ == '__main__':
         '--data_path', type=str, default='tau/commonsense_qa',
         help='huggingface data id or local data path')
     parser.add_argument(
-        '--peft_type', type=str, default='lora', choices=['lora', 'mole', 'adamole', 'corelora', 'mocorelora', 'molora'],
+        '--peft_type', type=str, default='lora', choices=['lora', 'mole', 'adamole', 'corelora', 'mocorelora', 'mocorelorash', 'denselora', 'molora'],
         help='peft model type to be fine-tuned')
     parser.add_argument(
         '--hydra', type=bool, default=False, 
@@ -109,10 +111,12 @@ if __name__ == '__main__':
     peft_type = args.peft_type
     num_experts = args.num_experts
     max_length = args.max_length
-    lora_rank = args.lora_rank if peft_type in ('lora', 'corelora', 'mocorelora') else args.lora_rank // num_experts
+    lora_rank = args.lora_rank if peft_type in ('lora', 'corelora', 'mocorelora', 'denselora', 'mocorelorash') else args.lora_rank // num_experts
     lora_alpha = lora_rank * 1
-    lora_dropout = 0
+    lora_dropout = 0.1
     peft_type_name = peft_type
+    if lora_rank != 16:
+        peft_type_name += f'-rank{lora_rank}'
     if peft_type == 'molora':
         peft_type_name += f'-hydra{args.hydra}'
     if args.top_k is not None:
@@ -122,7 +126,7 @@ if __name__ == '__main__':
         peft_type_name += f'-the{threshold_name}'
     elif args.num_experts > 1:
         peft_type_name += f'-exp{args.num_experts}'
-    if peft_type == 'mocorelora' and args.core_router:
+    if 'mocorelora' in peft_type and args.core_router:
         peft_type_name += f'-corerouter'
     if args.seed != 0:
         peft_type_name += f'-seed{args.seed}'
@@ -139,6 +143,11 @@ if __name__ == '__main__':
         # add_bos_token=True,
         add_eos_token=True,
     )
+    if 'llama' in model_name:
+        print('------------setting pad_token_id for llama 3.1')
+        tokenizer.pad_token_id = (
+            128255 # reserved special token
+        ) # llama 3.1 don't have pad_token, pad_token should be different from eos_token
 
     # Tokenize datasets
     # tokenize_text = lambda examples: tokenizer(
@@ -232,6 +241,26 @@ if __name__ == '__main__':
             bias="none",
             num_experts=num_experts,
             core_router=args.core_router,
+        )
+    elif peft_type == 'mocorelorash':
+        peft_config = MoCoreLoraShConfig(
+            lora_rank=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            target_modules=args.target_modules,
+            task_type=TaskType.CAUSAL_LM,
+            bias="none",
+            num_experts=num_experts,
+            core_router=args.core_router,
+        )
+    elif peft_type == 'denselora':
+        peft_config = DenseLoraConfig(
+            lora_rank=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            target_modules=args.target_modules,
+            task_type=TaskType.CAUSAL_LM,
+            bias="none",
         )
     elif peft_type == 'molora':
         peft_config = MoLoraConfig(
