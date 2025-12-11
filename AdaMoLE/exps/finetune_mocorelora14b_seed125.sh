@@ -7,7 +7,7 @@ echo "Number of devices: $num_devices"
 
 base_model=qwen3-14b
 model=mocorelora
-experts=8
+experts=4
 seed=seed125
 
 python train.py @configs/${base_model}_${model}_math14k_train_exp${experts}_${seed}.config
