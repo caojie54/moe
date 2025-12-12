@@ -21,8 +21,12 @@ def format_text(example, data_name: str, prompt_only: bool = True):
             "Write a response that appropriately completes the request.\n\n"
             "### Instruction:\n{instruction}\n\n### Response:"
         )}
-
-    if example["input"]:
+    if data_name == 'humaneval':
+        example['instruction'] = example['prompt']
+    elif data_name == 'mbpp':
+        example['instruction'] = example['text']
+                                         
+    if 'input' in example and example["input"]:
         text = PROMPT_DICT["prompt_input"].format_map(example)
     else:
         text = PROMPT_DICT["prompt_no_input"].format_map(example)

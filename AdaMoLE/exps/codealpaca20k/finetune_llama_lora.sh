@@ -9,8 +9,8 @@ base_model=llama-3-1-8b-instruct
 model=lora
 dataset=codealpaca20k
 
-python train.py @configs/${dataset}/${base_model}_${model}_train.config
+# python train.py @configs/${dataset}/${base_model}_${model}_train.config
 
-# python test_math.py @configs/${base_model}_${model}_math14k_test.config
+python test_code.py @configs/${dataset}/${base_model}_${model}_test.config
 
 # python evaluate_math.py --predict_file /data/workspace/projects/moe/AdaMoLE/outputs/${base_model}-${model}-math-14k/predictions/addsub_responses.jsonl
