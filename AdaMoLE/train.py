@@ -32,6 +32,16 @@ from src import (
     PeftModelForCausalLM,
 )
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 if __name__ == '__main__':
     # Add arguments
     parser = argparse.ArgumentParser(
@@ -48,7 +58,7 @@ if __name__ == '__main__':
         '--peft_type', type=str, default='lora', choices=['lora', 'mole', 'adamole', 'corelora', 'mocorelora', 'mocorelorash', 'denselora', 'molora'],
         help='peft model type to be fine-tuned')
     parser.add_argument(
-        '--hydra', type=bool, default=False, 
+        '--hydra', type=str2bool, nargs='?', const=True, default=False,
         help='hydralora in molora')
     parser.add_argument(
         '--lora_rank', type=int, default=32,
@@ -57,7 +67,7 @@ if __name__ == '__main__':
         '--target_modules', type=str, default=['q_proj', 'v_proj'], nargs='+',
         help='target modules in lora layers')
     parser.add_argument(
-        '--core_router', type=bool, default=False, 
+        '--core_router', type=str2bool, nargs='?', const=True, default=False,
         help='core router for mocorelora')
     parser.add_argument(
         '--num_experts', type=int, default=1,
